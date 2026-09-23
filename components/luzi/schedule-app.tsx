@@ -78,9 +78,9 @@ function countLabel(count: number) {
 }
 
 export function ScheduleApp() {
-  const [stored] = useState(loadSchedule)
-  const [types, setTypes] = useState(stored.types)
-  const [tasks, setTasks] = useState(stored.tasks)
+  const [types, setTypes] = useState<TaskType[]>(DEFAULT_TASK_TYPES)
+  const [tasks, setTasks] = useState<ScheduledTask[]>([])
+  const [hydrated, setHydrated] = useState(false)
   const [now, setNow] = useState<Date | null>(null)
   const [slotPx, setSlotPx] = useState(readSlot)
   const [drag, setDrag] = useState<DragPreview | null>(null)
@@ -314,6 +314,16 @@ export function ScheduleApp() {
   )
 
   useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const loaded = loadSchedule()
+      setTypes(loaded.types)
+      setTasks(loaded.tasks)
+      setHydrated(true)
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [])
+
+  useEffect(() => {
     tasksRef.current = tasks
     slotRef.current = slotPx
   }, [tasks, slotPx])
@@ -329,8 +339,9 @@ export function ScheduleApp() {
   }, [])
 
   useEffect(() => {
+    if (!hydrated) return
     saveSchedule({ types, tasks })
-  }, [tasks, types])
+  }, [hydrated, tasks, types])
 
   useEffect(() => {
     const tick = () => setNow(new Date())
