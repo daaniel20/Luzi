@@ -466,14 +466,14 @@ export function ScheduleApp() {
             role="list"
             aria-label="קוביות המשימות"
           >
-            <Button
+            <button
               type="button"
               onClick={() => setAddOpen(true)}
-              className="h-[80px] w-[84px] shrink-0 flex-col gap-1 rounded-[20px] text-sm font-bold"
+              className="inline-flex h-[80px] w-[84px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-[20px] bg-primary text-sm font-bold text-primary-foreground focus-visible:ring-3 focus-visible:ring-ring active:scale-95"
             >
               <Plus className="size-6" />
               חדשה
-            </Button>
+            </button>
             {types.map((type) => {
               const color = colorById(type.color)
               const lifted = drag?.kind === "create" && drag.typeId === type.id
