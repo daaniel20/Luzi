@@ -32,7 +32,7 @@ function sanitizeTypes(value: unknown): TaskType[] {
     if (typeof item.id !== "string" || typeof item.name !== "string") continue
     if (typeof item.emoji !== "string" || typeof item.color !== "string") continue
     if (!isTaskColor(item.color)) continue
-    const name = item.name.trim().slice(0, 16)
+    const name = item.name.trim().slice(0, 32)
     if (!name) continue
     types.push({ id: item.id, name, emoji: item.emoji, color: item.color })
   }

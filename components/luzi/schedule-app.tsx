@@ -111,6 +111,8 @@ export function ScheduleApp() {
   const [toast, setToast] = useState<ToastState | null>(null)
 
   const tasksRef = useRef(tasks)
+  const typesRef = useRef(types)
+  const orderRef = useRef<string[] | null>(null)
   const slotRef = useRef(slotPx)
   const axisRef = useRef({ rangeStart, rangeEnd, slot })
   const exportRef = useRef<HTMLDivElement>(null)
@@ -197,6 +199,55 @@ export function ScheduleApp() {
       }
       return view
     })
+
+    if (session.kind === "create" && orderRef.current) {
+      if (view.zone === "bank") {
+        const bank = bankScrollRef.current
+        if (bank) {
+          const bankRect = bank.getBoundingClientRect()
+          if (session.y < bankRect.top + 40) bank.scrollTop -= 12
+          else if (session.y > bankRect.bottom - 40) bank.scrollTop += 12
+          const chips = [...bank.querySelectorAll<HTMLElement>("[data-testid^='chip-']")]
+          let target = 0
+          let best = Number.POSITIVE_INFINITY
+          chips.forEach((chip, index) => {
+            const chipRect = chip.getBoundingClientRect()
+            const distance = Math.hypot(
+              session.x - (chipRect.left + chipRect.width / 2),
+              session.y - (chipRect.top + chipRect.height / 2)
+            )
+            if (distance < best) {
+              best = distance
+              target = index
+            }
+          })
+          setTypes((previous) => {
+            const from = previous.findIndex((type) => type.id === session.typeId)
+            if (from < 0 || from === target) return previous
+            const next = previous.slice()
+            const [item] = next.splice(from, 1)
+            next.splice(target, 0, item)
+            return next
+          })
+        }
+      } else {
+        const ids = orderRef.current
+        setTypes((previous) => {
+          const byId = new Map(previous.map((type) => [type.id, type]))
+          const next = ids.flatMap((id) => {
+            const type = byId.get(id)
+            return type ? [type] : []
+          })
+          for (const type of previous) {
+            if (!ids.includes(type.id)) next.push(type)
+          }
+          if (next.length === previous.length && next.every((type, index) => type.id === previous[index]?.id)) {
+            return previous
+          }
+          return next
+        })
+      }
+    }
 
     const rect = scroller.getBoundingClientRect()
     const nearTimeline = session.x > rect.left - 48 && session.x < rect.right + 48
@@ -312,6 +363,9 @@ export function ScheduleApp() {
           const threshold = session.kind.startsWith("resize") ? 3 : 8
           if (distance < threshold) return
           session.active = true
+          if (session.kind === "create") {
+            orderRef.current = typesRef.current.map((type) => type.id)
+          }
           if (session.kind === "move") {
             session.grabOffset = readMinute(native.clientY) - session.originStart
           }
@@ -326,6 +380,30 @@ export function ScheduleApp() {
         window.removeEventListener("pointerup", onUp)
         window.removeEventListener("pointercancel", onCancel)
         stopLoop()
+        const droppedInBank =
+          shouldCommit &&
+          session.active &&
+          session.kind === "create" &&
+          zoneAt(session.x, session.y, {
+            timeline: scrollerRef.current?.getBoundingClientRect() ?? null,
+            trash: trashRef.current?.getBoundingClientRect() ?? null,
+            bank: bankRef.current?.getBoundingClientRect() ?? null,
+          }) === "bank"
+        if (session.kind === "create" && session.active && !droppedInBank && orderRef.current) {
+          const ids = orderRef.current
+          setTypes((previous) => {
+            const byId = new Map(previous.map((type) => [type.id, type]))
+            const next = ids.flatMap((id) => {
+              const type = byId.get(id)
+              return type ? [type] : []
+            })
+            for (const type of previous) {
+              if (!ids.includes(type.id)) next.push(type)
+            }
+            return next
+          })
+        }
+        orderRef.current = null
         if (shouldCommit && session.active) commit(session)
         if (sessionRef.current === session) sessionRef.current = null
         setDrag(null)
@@ -362,9 +440,10 @@ export function ScheduleApp() {
 
   useEffect(() => {
     tasksRef.current = tasks
+    typesRef.current = types
     slotRef.current = slotPx
     axisRef.current = { rangeStart, rangeEnd, slot }
-  }, [tasks, slotPx, rangeStart, rangeEnd, slot])
+  }, [tasks, types, slotPx, rangeStart, rangeEnd, slot])
 
   useEffect(() => {
     const onResize = () => {
@@ -604,7 +683,7 @@ export function ScheduleApp() {
                   data-testid={`chip-${type.id}`}
                   onPointerDown={(event) => begin(event, "create", type.id)}
                   className={cn(
-                    "relative flex h-[88px] w-full cursor-grab touch-none flex-col items-center justify-center gap-1 rounded-[20px] px-2 select-none active:cursor-grabbing",
+                    "relative flex h-[104px] w-full cursor-grab touch-none flex-col items-center justify-center gap-1 rounded-[20px] px-2 select-none active:cursor-grabbing",
                     lifted && "scale-95 opacity-45"
                   )}
                   style={{ background: color.bg, color: color.ink }}
@@ -632,7 +711,7 @@ export function ScheduleApp() {
                   <span className="text-[30px] leading-none" aria-hidden>
                     {type.emoji}
                   </span>
-                  <span className="line-clamp-2 w-full text-center text-[13px] leading-4 font-bold">
+                  <span className="line-clamp-3 w-full text-center text-[15px] leading-5 font-bold">
                     {type.name}
                   </span>
                 </div>

@@ -97,7 +97,7 @@ export function AddTaskDialog({ open, mode, initial, onOpenChange, onSubmit }: A
               שם המשימה
               <Input
                 value={name}
-                maxLength={16}
+                maxLength={32}
                 placeholder="לדוגמה: רכיבה"
                 onChange={(event) => setName(event.target.value)}
                 className="h-12 rounded-2xl px-4 text-lg"
