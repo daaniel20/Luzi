@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react"
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, Minus, Plus, Trash2 } from "lucide-react"
 import {
   useCallback,
   useEffect,
@@ -24,7 +24,7 @@ import {
 import { colorById } from "@/lib/colors"
 import { DEFAULT_TASK_TYPES } from "@/lib/defaults"
 import {
-  minuteAt,
+  minuteAtY,
   previewDrag,
   zoneAt,
   type DragKind,
@@ -33,15 +33,21 @@ import {
 import { loadSchedule, saveSchedule } from "@/lib/storage"
 import type { ScheduledTask, TaskColorId, TaskType } from "@/lib/types"
 import {
-  DAY_END,
-  DAY_START,
+  DAY_MINUTES,
   DEFAULT_DURATION,
-  SLOT,
-  SLOT_COUNT,
+  DEFAULT_RANGE_END,
+  DEFAULT_RANGE_START,
+  DEFAULT_SLOT,
+  SLOT_STEPS,
   clamp,
   formatClock,
+  formatRange,
   greetingFor,
+  isSlotStep,
+  nowMinutes,
   overlaps,
+  resolveRange,
+  slotLabel,
 } from "@/lib/time"
 import { cn } from "cn"
 
@@ -65,9 +71,15 @@ type ToastState = {
   undo?: () => void
 }
 
-function readSlot() {
-  if (typeof window === "undefined") return 68
-  return window.matchMedia("(max-width: 760px)").matches ? 54 : 68
+function readSlotPx() {
+  if (typeof window === "undefined") return 44
+  return window.matchMedia("(max-width: 760px)").matches ? 40 : 48
+}
+
+function clockToMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map((part) => Number(part))
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return DEFAULT_RANGE_START
+  return clamp(hours, 0, 23) * 60 + clamp(minutes, 0, 59)
 }
 
 function countLabel(count: number) {
@@ -82,7 +94,14 @@ export function ScheduleApp() {
   const [tasks, setTasks] = useState<ScheduledTask[]>([])
   const [hydrated, setHydrated] = useState(false)
   const [now, setNow] = useState<Date | null>(null)
-  const [slotPx, setSlotPx] = useState(readSlot)
+  const [slotPx, setSlotPx] = useState(readSlotPx)
+  const [rangeStart, setRangeStart] = useState(DEFAULT_RANGE_START)
+  const [rangeEnd, setRangeEnd] = useState(DEFAULT_RANGE_END)
+  const [slot, setSlot] = useState(DEFAULT_SLOT)
+  const [rangeOpen, setRangeOpen] = useState(false)
+  const [draftStart, setDraftStart] = useState("06:30")
+  const [draftEnd, setDraftEnd] = useState("06:30")
+  const [exporting, setExporting] = useState(false)
   const [drag, setDrag] = useState<DragPreview | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [deleteType, setDeleteType] = useState<TaskType | null>(null)
@@ -90,6 +109,8 @@ export function ScheduleApp() {
 
   const tasksRef = useRef(tasks)
   const slotRef = useRef(slotPx)
+  const axisRef = useRef({ rangeStart, rangeEnd, slot })
+  const exportRef = useRef<HTMLDivElement>(null)
   const sessionRef = useRef<Session | null>(null)
   const loopRef = useRef(0)
   const toastTimer = useRef(0)
@@ -110,16 +131,11 @@ export function ScheduleApp() {
     loopRef.current = 0
   }, [])
 
-  const readMinute = useCallback((clientX: number) => {
+  const readMinute = useCallback((clientY: number) => {
     const element = scrollerRef.current
-    if (!element) return DAY_START
-    return minuteAt(
-      clientX,
-      element.getBoundingClientRect(),
-      element.scrollLeft,
-      slotRef.current,
-      SLOT_COUNT
-    )
+    const axis = axisRef.current
+    if (!element) return axis.rangeStart
+    return minuteAtY(clientY, element.getBoundingClientRect(), element.scrollTop, slotRef.current, axis)
   }, [])
 
   const buildPreview = useCallback(
@@ -140,7 +156,8 @@ export function ScheduleApp() {
           trash: trashRef.current?.getBoundingClientRect() ?? null,
           bank: bankRef.current?.getBoundingClientRect() ?? null,
         }),
-        minute: readMinute(session.x),
+        minute: readMinute(session.y),
+        ...axisRef.current,
       })
     },
     [readMinute]
@@ -171,10 +188,10 @@ export function ScheduleApp() {
     })
 
     const rect = scroller.getBoundingClientRect()
-    const nearTimeline = session.y > rect.top - 48 && session.y < rect.bottom + 48
+    const nearTimeline = session.x > rect.left - 48 && session.x < rect.right + 48
     if (!nearTimeline) return
-    if (session.x < rect.left + 72) scroller.scrollLeft -= 16
-    else if (session.x > rect.right - 72) scroller.scrollLeft += 16
+    if (session.y < rect.top + 72) scroller.scrollTop -= 18
+    else if (session.y > rect.bottom - 72) scroller.scrollTop += 18
   }, [buildPreview])
 
   const ensureLoop = useCallback(() => {
@@ -269,8 +286,8 @@ export function ScheduleApp() {
         x: event.clientX,
         y: event.clientY,
         active: false,
-        originStart: task?.start ?? DAY_START,
-        originEnd: task?.end ?? DAY_START + DEFAULT_DURATION,
+        originStart: task?.start ?? axisRef.current.rangeStart,
+        originEnd: task?.end ?? axisRef.current.rangeStart + DEFAULT_DURATION,
         grabOffset: 0,
       }
       sessionRef.current = session
@@ -285,7 +302,7 @@ export function ScheduleApp() {
           if (distance < threshold) return
           session.active = true
           if (session.kind === "move") {
-            session.grabOffset = readMinute(native.clientX) - session.originStart
+            session.grabOffset = readMinute(native.clientY) - session.originStart
           }
         }
         native.preventDefault()
@@ -318,6 +335,14 @@ export function ScheduleApp() {
       const loaded = loadSchedule()
       setTypes(loaded.types)
       setTasks(loaded.tasks)
+      setRangeStart(loaded.rangeStart)
+      setRangeEnd(loaded.rangeEnd)
+      setSlot(loaded.slot)
+      axisRef.current = {
+        rangeStart: loaded.rangeStart,
+        rangeEnd: loaded.rangeEnd,
+        slot: loaded.slot,
+      }
       setHydrated(true)
     })
     return () => window.cancelAnimationFrame(frame)
@@ -326,11 +351,12 @@ export function ScheduleApp() {
   useEffect(() => {
     tasksRef.current = tasks
     slotRef.current = slotPx
-  }, [tasks, slotPx])
+    axisRef.current = { rangeStart, rangeEnd, slot }
+  }, [tasks, slotPx, rangeStart, rangeEnd, slot])
 
   useEffect(() => {
     const onResize = () => {
-      const next = readSlot()
+      const next = readSlotPx()
       slotRef.current = next
       setSlotPx(next)
     }
@@ -340,8 +366,8 @@ export function ScheduleApp() {
 
   useEffect(() => {
     if (!hydrated) return
-    saveSchedule({ types, tasks })
-  }, [hydrated, tasks, types])
+    saveSchedule({ types, tasks, rangeStart, rangeEnd, slot })
+  }, [hydrated, tasks, types, rangeStart, rangeEnd, slot])
 
   useEffect(() => {
     const tick = () => setNow(new Date())
@@ -353,10 +379,11 @@ export function ScheduleApp() {
   useEffect(() => {
     if (didInitialScroll.current || !scrollerRef.current) return
     didInitialScroll.current = true
-    const date = new Date()
-    const nowMin = date.getHours() * 60 + date.getMinutes()
-    const anchor = clamp(nowMin - 30, DAY_START, DAY_END - 60)
-    scrollerRef.current.scrollLeft = ((anchor - DAY_START) / SLOT) * slotRef.current
+    const axis = axisRef.current
+    const clock = nowMinutes(new Date())
+    const absolute = clock >= axis.rangeStart ? clock : clock + DAY_MINUTES
+    const anchor = clamp(absolute - 40, axis.rangeStart, Math.max(axis.rangeStart, axis.rangeEnd - 60))
+    scrollerRef.current.scrollTop = ((anchor - axis.rangeStart) / axis.slot) * slotRef.current
   }, [slotPx])
 
   useEffect(() => stopLoop, [stopLoop])
@@ -371,10 +398,22 @@ export function ScheduleApp() {
       }).format(now)
     : ""
 
-  const nowMin = now ? now.getHours() * 60 + now.getMinutes() : null
-  const showNow = nowMin !== null && nowMin >= DAY_START && nowMin <= DAY_END
-  const trackWidth = SLOT_COUNT * slotPx
+  const clockNow = now ? nowMinutes(now) : null
+  const absoluteNow =
+    clockNow === null
+      ? null
+      : clockNow >= rangeStart && clockNow <= rangeEnd
+        ? clockNow
+        : clockNow + DAY_MINUTES <= rangeEnd
+          ? clockNow + DAY_MINUTES
+          : null
+  const slotCount = Math.max(1, Math.round((rangeEnd - rangeStart) / slot))
+  const trackHeight = slotCount * slotPx
   const deleting = drag?.deleting === true
+  const slotIndex = SLOT_STEPS.indexOf(isSlotStep(slot) ? slot : DEFAULT_SLOT)
+  const marks = Array.from({ length: slotCount + 1 }, (_, index) => rangeStart + index * slot).filter(
+    (minute) => minute % 60 === 0 || minute === rangeStart || minute === rangeEnd
+  )
 
   function createType(input: { name: string; emoji: string; color: TaskColorId }) {
     setTypes((previous) => [
@@ -401,6 +440,60 @@ export function ScheduleApp() {
     setTasks((previous) => previous.filter((task) => task.typeId !== id))
     setDeleteType(null)
     showToast("הסוג נמחק מהבנק")
+  }
+
+  function changeSlot(direction: -1 | 1) {
+    const next = SLOT_STEPS[slotIndex + direction]
+    if (!next) return
+    setSlot(next)
+    showToast(slotLabel(next))
+  }
+
+  function openRange() {
+    setDraftStart(formatClock(rangeStart))
+    setDraftEnd(formatClock(rangeEnd))
+    setRangeOpen(true)
+  }
+
+  function applyRange() {
+    const next = resolveRange(clockToMinutes(draftStart), clockToMinutes(draftEnd))
+    setRangeStart(next.rangeStart)
+    setRangeEnd(next.rangeEnd)
+    setRangeOpen(false)
+  }
+
+  async function exportImage() {
+    const node = exportRef.current
+    if (!node || exporting) return
+    setExporting(true)
+    try {
+      const { toPng } = await import("html-to-image")
+      const wrap = document.createElement("div")
+      wrap.dir = "rtl"
+      wrap.style.cssText = `width:${Math.max(node.offsetWidth, 360)}px;background:#f4f9fc;padding:20px;font-family:Rubik,sans-serif;`
+      const title = document.createElement("div")
+      title.style.cssText = "font-weight:700;font-size:28px;color:#355067;margin-bottom:6px;"
+      title.textContent = "LUZI"
+      const subtitle = document.createElement("div")
+      subtitle.dir = "ltr"
+      subtitle.style.cssText = "font-weight:600;font-size:16px;color:#5d7386;margin-bottom:14px;text-align:right;"
+      subtitle.textContent = `${dateLabel}  ·  ${formatRange(rangeStart, rangeEnd)}  ·  ${slotLabel(slot)}`
+      wrap.append(title, subtitle, node.cloneNode(true) as HTMLElement)
+      wrap.style.position = "fixed"
+      wrap.style.left = "-10000px"
+      wrap.style.top = "0"
+      document.body.appendChild(wrap)
+      const dataUrl = await toPng(wrap, { pixelRatio: 2, backgroundColor: "#f4f9fc" })
+      wrap.remove()
+      const link = document.createElement("a")
+      link.href = dataUrl
+      link.download = `luzi-${new Date().toISOString().slice(0, 10)}.png`
+      link.click()
+    } catch {
+      showToast("לא הצלחנו לייצא תמונה")
+    } finally {
+      setExporting(false)
+    }
   }
 
   const dragType = drag ? typeMap.get(drag.typeId) : undefined
@@ -531,44 +624,73 @@ export function ScheduleApp() {
       </section>
 
       <section className="flex min-h-[300px] flex-1 flex-col rounded-[28px] bg-white/92 p-3 shadow-[0_10px_30px_rgba(90,130,160,0.08)] ring-1 ring-white sm:p-4">
-        <div className="mb-2 flex items-center justify-between gap-3">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
             <h2 className="text-xl font-bold text-[#355067]">ציר היום</h2>
             <p className="truncate text-sm font-medium text-[#6d7e8e]">
-              <span dir="ltr">07:00–20:00</span>
+              <span dir="ltr">{formatRange(rangeStart, rangeEnd)}</span>
               {" · "}
-              כל משבצת רבע שעה
+              {slotLabel(slot)}
               {" · "}
               {countLabel(tasks.length)}
             </p>
           </div>
-          <div dir="ltr" className="flex shrink-0 items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              aria-label="שעות מוקדמות יותר"
-              onClick={() =>
-                scrollerRef.current?.scrollBy({
-                  left: -slotPx * 4,
-                  behavior: "smooth",
-                })
-              }
-              className="flex size-12 items-center justify-center rounded-2xl bg-[#ffc999] text-[#6b3a0c] active:scale-95"
+              onClick={openRange}
+              className="h-12 rounded-2xl bg-[#e7f3fb] px-3 text-sm font-bold text-[#355067] active:scale-95"
             >
-              <ChevronLeft className="size-6" />
+              טווח שעות
             </button>
+            <div className="flex h-12 items-center gap-1 rounded-2xl bg-[#e7f3fb] px-1">
+              <button
+                type="button"
+                aria-label="רזולוציה גסה יותר"
+                disabled={slotIndex <= 0}
+                onClick={() => changeSlot(-1)}
+                className="flex size-10 items-center justify-center rounded-xl text-[#355067] active:scale-95 disabled:opacity-35"
+              >
+                <Minus className="size-5" />
+              </button>
+              <span className="min-w-10 text-center text-sm font-bold text-[#355067]">{slot}</span>
+              <button
+                type="button"
+                aria-label="רזולוציה עדינה יותר"
+                disabled={slotIndex >= SLOT_STEPS.length - 1}
+                onClick={() => changeSlot(1)}
+                className="flex size-10 items-center justify-center rounded-xl text-[#355067] active:scale-95 disabled:opacity-35"
+              >
+                <Plus className="size-5" />
+              </button>
+            </div>
             <button
               type="button"
-              aria-label="שעות מאוחרות יותר"
-              onClick={() =>
-                scrollerRef.current?.scrollBy({
-                  left: slotPx * 4,
-                  behavior: "smooth",
-                })
-              }
-              className="flex size-12 items-center justify-center rounded-2xl bg-[#ffc999] text-[#6b3a0c] active:scale-95"
+              onClick={exportImage}
+              disabled={exporting}
+              className="flex h-12 items-center gap-1 rounded-2xl bg-[#d9f6e4] px-3 text-sm font-bold text-[#1f6b45] active:scale-95 disabled:opacity-60"
             >
-              <ChevronRight className="size-6" />
+              <Download className="size-4" />
+              {exporting ? "שומר..." : "תמונה"}
             </button>
+            <div dir="ltr" className="flex items-center gap-1">
+              <button
+                type="button"
+                aria-label="שעות מוקדמות יותר"
+                onClick={() => scrollerRef.current?.scrollBy({ top: -slotPx * 4, behavior: "smooth" })}
+                className="flex size-12 items-center justify-center rounded-2xl bg-[#ffc999] text-[#6b3a0c] active:scale-95"
+              >
+                <ChevronUp className="size-6" />
+              </button>
+              <button
+                type="button"
+                aria-label="שעות מאוחרות יותר"
+                onClick={() => scrollerRef.current?.scrollBy({ top: slotPx * 4, behavior: "smooth" })}
+                className="flex size-12 items-center justify-center rounded-2xl bg-[#ffc999] text-[#6b3a0c] active:scale-95"
+              >
+                <ChevronDown className="size-6" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -577,47 +699,41 @@ export function ScheduleApp() {
             ref={scrollerRef}
             data-testid="timeline"
             dir="ltr"
-            className="luzi-track luzi-scroll absolute inset-0 overflow-x-auto overflow-y-hidden rounded-[22px] bg-[#f4f9fc]"
+            className="luzi-track luzi-scroll absolute inset-0 overflow-x-hidden overflow-y-auto rounded-[22px] bg-[#f4f9fc]"
           >
-            <div className="flex h-full min-h-[210px] items-center" style={{ width: trackWidth }}>
-            <div className="relative h-[190px] w-full">
-              {Array.from({ length: 14 }, (_, index) => {
-                const hour = 7 + index
-                const left = index * 4 * slotPx
-                const isEnd = hour === 20
+            <div ref={exportRef} className="relative w-full" style={{ height: trackHeight }}>
+              {Array.from({ length: slotCount + 1 }, (_, index) => {
+                const minute = rangeStart + index * slot
+                const major = minute % 60 === 0
                 return (
                   <div
-                    key={hour}
-                    className="absolute top-2 text-sm font-bold text-[#5d7386]"
-                    style={{
-                      left,
-                      transform: isEnd ? "translateX(-100%)" : undefined,
-                    }}
-                  >
-                    {formatClock(hour * 60)}
-                  </div>
+                    key={minute}
+                    className={cn(
+                      "pointer-events-none absolute inset-x-3 h-px",
+                      major ? "bg-[#b7cddd]" : "bg-[#e3eef5]"
+                    )}
+                    style={{ top: index * slotPx }}
+                  />
                 )
               })}
 
-              <div className="absolute inset-x-0 top-11 h-[136px] rounded-[20px] bg-white/75" />
-
-              {Array.from({ length: SLOT_COUNT + 1 }, (_, index) => (
+              {marks.map((minute) => (
                 <div
-                  key={index}
-                  className={cn(
-                    "pointer-events-none absolute top-12 bottom-4 w-px",
-                    index % 4 === 0 ? "bg-[#b7cddd]" : "bg-[#e3eef5]"
-                  )}
-                  style={{ left: index * slotPx }}
-                />
+                  key={minute}
+                  dir="ltr"
+                  className="pointer-events-none absolute start-2 z-10 -translate-y-1/2 text-xs font-bold text-[#5d7386]"
+                  style={{ top: ((minute - rangeStart) / slot) * slotPx }}
+                >
+                  {formatClock(minute)}
+                </div>
               ))}
 
-              {showNow && nowMin !== null && (
+              {absoluteNow !== null && (
                 <div
-                  className="pointer-events-none absolute top-10 bottom-3 z-20 w-0.5 bg-[#ff8fb3]"
-                  style={{ left: ((nowMin - DAY_START) / SLOT) * slotPx }}
+                  className="pointer-events-none absolute inset-x-14 z-20 h-0.5 bg-[#ff8fb3]"
+                  style={{ top: ((absoluteNow - rangeStart) / slot) * slotPx }}
                 >
-                  <span className="absolute -top-0.5 left-1/2 -translate-x-1/2 rounded-full bg-[#ff8fb3] px-2 py-0.5 text-[11px] font-bold whitespace-nowrap text-white">
+                  <span className="absolute -top-3 end-1 rounded-full bg-[#ff8fb3] px-2 py-0.5 text-[11px] font-bold text-white">
                     עכשיו
                   </span>
                 </div>
@@ -626,6 +742,7 @@ export function ScheduleApp() {
               {tasks.map((task) => {
                 const type = typeMap.get(task.typeId)
                 if (!type) return null
+                if (task.end <= rangeStart || task.start >= rangeEnd) return null
                 const moving = drag?.taskId === task.id && drag.kind !== "create"
                 const start = moving ? drag.start : task.start
                 const end = moving ? drag.end : task.end
@@ -644,17 +761,14 @@ export function ScheduleApp() {
                     color={colorById(type.color)}
                     start={start}
                     end={end}
+                    rangeStart={rangeStart}
+                    slot={slot}
                     slotPx={slotPx}
                     mode={mode}
                     active={Boolean(moving)}
                     onPointerDown={(event) => begin(event, "move", type.id, task)}
                     onResizePointerDown={(edge, event) =>
-                      begin(
-                        event,
-                        edge === "start" ? "resize-start" : "resize-end",
-                        type.id,
-                        task
-                      )
+                      begin(event, edge === "start" ? "resize-start" : "resize-end", type.id, task)
                     }
                   />
                 )
@@ -667,12 +781,13 @@ export function ScheduleApp() {
                   color={colorById(dragType.color)}
                   start={drag.start}
                   end={drag.end}
+                  rangeStart={rangeStart}
+                  slot={slot}
                   slotPx={slotPx}
                   mode={drag.valid ? "preview" : "invalid"}
                   active
                 />
               )}
-            </div>
             </div>
           </div>
 
@@ -681,7 +796,7 @@ export function ScheduleApp() {
               <div className="max-w-sm rounded-[24px] bg-white/80 px-5 py-4 shadow-sm">
                 <p className="text-lg font-bold text-[#355067]">גררו לכאן משימה מהבנק</p>
                 <p className="mt-1 text-sm font-medium text-[#6d7e8e]">
-                  היא תיצמד לרבע השעה הקרוב. מושכים מהקצה כדי להאריך, ואל הפח כדי למחוק.
+                  היא תיצמד לרזולוציה שבחרתם. מושכים מהקצה העליון או התחתון כדי להאריך, ואל הפח כדי למחוק.
                 </p>
               </div>
             </div>
@@ -747,6 +862,45 @@ export function ScheduleApp() {
       )}
 
       <AddTaskDialog open={addOpen} onOpenChange={setAddOpen} onCreate={createType} />
+
+      <Dialog open={rangeOpen} onOpenChange={setRangeOpen}>
+        <DialogContent className="rounded-[28px] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">אילו שעות להציג?</DialogTitle>
+            <DialogDescription className="text-base">
+              ברירת המחדל היא מ־06:30 לאורך יממה. אם שעת הסיום מוקדמת או זהה להתחלה, הטווח ממשיך עד למחרת.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-sm font-bold text-[#355067]">
+              מהשעה
+              <input
+                type="time"
+                value={draftStart}
+                onChange={(event) => setDraftStart(event.target.value)}
+                className="mt-1 h-12 w-full rounded-2xl border border-[#d5e4ef] bg-white px-3 text-lg font-bold"
+              />
+            </label>
+            <label className="text-sm font-bold text-[#355067]">
+              עד השעה
+              <input
+                type="time"
+                value={draftEnd}
+                onChange={(event) => setDraftEnd(event.target.value)}
+                className="mt-1 h-12 w-full rounded-2xl border border-[#d5e4ef] bg-white px-3 text-lg font-bold"
+              />
+            </label>
+          </div>
+          <DialogFooter className="mx-0 mb-0 flex-row gap-2 border-0 bg-transparent p-0">
+            <Button type="button" variant="outline" className="h-12 flex-1 rounded-2xl text-base font-bold" onClick={() => setRangeOpen(false)}>
+              ביטול
+            </Button>
+            <Button type="button" className="h-12 flex-1 rounded-2xl bg-[#355067] text-base font-bold" onClick={applyRange}>
+              שמירה
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={deleteType !== null} onOpenChange={(open) => !open && setDeleteType(null)}>
         <DialogContent className="rounded-[28px] sm:max-w-md">

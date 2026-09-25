@@ -2,12 +2,13 @@ import { isTaskColor } from "@/lib/colors"
 import { DEFAULT_TASK_TYPES } from "@/lib/defaults"
 import type { ScheduledTask, TaskType } from "@/lib/types"
 import {
-  DAY_END,
-  DAY_START,
-  SLOT,
+  DAY_MINUTES,
+  DEFAULT_RANGE_END,
+  DEFAULT_RANGE_START,
+  DEFAULT_SLOT,
   clamp,
+  isSlotStep,
   overlaps,
-  snap,
   todayKey,
 } from "@/lib/time"
 
@@ -16,6 +17,9 @@ const STORAGE_KEY = "luzi-schedule-v1"
 export type ScheduleState = {
   types: TaskType[]
   tasks: ScheduledTask[]
+  rangeStart: number
+  rangeEnd: number
+  slot: number
 }
 
 function sanitizeTypes(value: unknown): TaskType[] {
@@ -29,12 +33,7 @@ function sanitizeTypes(value: unknown): TaskType[] {
     if (!isTaskColor(item.color)) continue
     const name = item.name.trim().slice(0, 16)
     if (!name) continue
-    types.push({
-      id: item.id,
-      name,
-      emoji: item.emoji,
-      color: item.color,
-    })
+    types.push({ id: item.id, name, emoji: item.emoji, color: item.color })
   }
   return types
 }
@@ -48,33 +47,57 @@ function sanitizeTasks(value: unknown, typeIds: Set<string>): ScheduledTask[] {
     if (typeof item.id !== "string" || typeof item.typeId !== "string") continue
     if (!typeIds.has(item.typeId)) continue
     if (typeof item.start !== "number" || typeof item.end !== "number") continue
-    const start = clamp(snap(item.start), DAY_START, DAY_END - SLOT)
-    const end = clamp(snap(item.end), start + SLOT, DAY_END)
+    const start = clamp(Math.round(item.start), 0, DAY_MINUTES * 2 - 5)
+    const end = clamp(Math.round(item.end), start + 5, DAY_MINUTES * 2)
     if (overlaps(tasks, start, end)) continue
     tasks.push({ id: item.id, typeId: item.typeId, start, end })
   }
   return tasks
 }
 
-export function loadSchedule(): ScheduleState {
-  if (typeof window === "undefined") {
-    return { types: DEFAULT_TASK_TYPES, tasks: [] }
+function readAxis(parsed: { rangeStart?: unknown; rangeEnd?: unknown; slot?: unknown }) {
+  const rangeStart =
+    typeof parsed.rangeStart === "number" ? parsed.rangeStart : DEFAULT_RANGE_START
+  const rangeEnd = typeof parsed.rangeEnd === "number" ? parsed.rangeEnd : DEFAULT_RANGE_END
+  const slot = typeof parsed.slot === "number" && isSlotStep(parsed.slot) ? parsed.slot : DEFAULT_SLOT
+  return {
+    rangeStart: clamp(Math.round(rangeStart), 0, DAY_MINUTES - 1),
+    rangeEnd: clamp(Math.round(rangeEnd), 30, DAY_MINUTES * 2),
+    slot,
   }
+}
+
+const empty = (): ScheduleState => ({
+  types: DEFAULT_TASK_TYPES,
+  tasks: [],
+  rangeStart: DEFAULT_RANGE_START,
+  rangeEnd: DEFAULT_RANGE_END,
+  slot: DEFAULT_SLOT,
+})
+
+export function loadSchedule(): ScheduleState {
+  if (typeof window === "undefined") return empty()
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { types: DEFAULT_TASK_TYPES, tasks: [] }
+    if (!raw) return empty()
     const parsed = JSON.parse(raw) as {
       types?: unknown
       tasks?: unknown
       day?: unknown
+      rangeStart?: unknown
+      rangeEnd?: unknown
+      slot?: unknown
     }
     const types = sanitizeTypes(parsed.types)
     const typeIds = new Set(types.map((type) => type.id))
-    const tasks =
-      parsed.day === todayKey() ? sanitizeTasks(parsed.tasks, typeIds) : []
-    return { types: types.length > 0 ? types : DEFAULT_TASK_TYPES, tasks }
+    const tasks = parsed.day === todayKey() ? sanitizeTasks(parsed.tasks, typeIds) : []
+    return {
+      types: types.length > 0 ? types : DEFAULT_TASK_TYPES,
+      tasks,
+      ...readAxis(parsed),
+    }
   } catch {
-    return { types: DEFAULT_TASK_TYPES, tasks: [] }
+    return empty()
   }
 }
 
@@ -85,6 +108,9 @@ export function saveSchedule(state: ScheduleState) {
       types: state.types,
       tasks: state.tasks,
       day: todayKey(),
+      rangeStart: state.rangeStart,
+      rangeEnd: state.rangeEnd,
+      slot: state.slot,
     })
   )
 }

@@ -1,13 +1,5 @@
 import type { ScheduledTask } from "@/lib/types"
-import {
-  DAY_END,
-  DAY_START,
-  DEFAULT_DURATION,
-  SLOT,
-  clamp,
-  overlaps,
-  snap,
-} from "@/lib/time"
+import { DEFAULT_DURATION, clamp, overlaps, snap } from "@/lib/time"
 
 export type Zone = "timeline" | "trash" | "bank" | "outside"
 
@@ -24,6 +16,12 @@ export type DragPreview = {
   end: number
   valid: boolean
   deleting: boolean
+}
+
+export type Axis = {
+  rangeStart: number
+  rangeEnd: number
+  slot: number
 }
 
 export function zoneAt(
@@ -43,32 +41,36 @@ export function zoneAt(
   return "outside"
 }
 
-export function minuteAt(
-  clientX: number,
+export function minuteAtY(
+  clientY: number,
   rect: DOMRect,
-  scrollLeft: number,
+  scrollTop: number,
   slotPx: number,
-  slotCount: number
+  axis: Axis
 ) {
-  const x = clientX - rect.left + scrollLeft
-  const maxX = slotCount * slotPx
-  const clamped = Math.min(Math.max(0, x), maxX)
-  return DAY_START + (clamped / slotPx) * SLOT
+  const y = clientY - rect.top + scrollTop
+  const span = axis.rangeEnd - axis.rangeStart
+  const maxY = (span / axis.slot) * slotPx
+  const clamped = Math.min(Math.max(0, y), maxY)
+  return axis.rangeStart + (clamped / slotPx) * axis.slot
 }
 
-export function previewDrag(input: {
-  kind: DragKind
-  typeId: string
-  taskId?: string
-  x: number
-  y: number
-  originStart: number
-  originEnd: number
-  grabOffset: number
-  tasks: ScheduledTask[]
-  zone: Zone
-  minute: number
-}): DragPreview {
+export function previewDrag(
+  input: {
+    kind: DragKind
+    typeId: string
+    taskId?: string
+    x: number
+    y: number
+    originStart: number
+    originEnd: number
+    grabOffset: number
+    tasks: ScheduledTask[]
+    zone: Zone
+    minute: number
+  } & Axis
+): DragPreview {
+  const { rangeStart, rangeEnd, slot } = input
   const base = {
     kind: input.kind,
     typeId: input.typeId,
@@ -82,41 +84,33 @@ export function previewDrag(input: {
     if (input.zone !== "timeline") {
       return {
         ...base,
-        start: DAY_START,
-        end: DAY_START + DEFAULT_DURATION,
+        start: rangeStart,
+        end: rangeStart + DEFAULT_DURATION,
         valid: false,
         deleting: false,
       }
     }
-    let start = snap(input.minute)
-    start = clamp(start, DAY_START, DAY_END - SLOT)
-    const occupied = input.tasks.some(
-      (task) => start >= task.start && start < task.end
-    )
+    let start = snap(input.minute, slot)
+    start = clamp(start, rangeStart, rangeEnd - slot)
+    const occupied = input.tasks.some((task) => start >= task.start && start < task.end)
     if (occupied) {
-      return { ...base, start, end: start + SLOT, valid: false, deleting: false }
+      return { ...base, start, end: start + slot, valid: false, deleting: false }
     }
     const nextStart = input.tasks
       .filter((task) => task.start >= start)
-      .reduce((min, task) => Math.min(min, task.start), DAY_END)
+      .reduce((min, task) => Math.min(min, task.start), rangeEnd)
     const room = nextStart - start
-    const duration = Math.floor(Math.min(DEFAULT_DURATION, room) / SLOT) * SLOT
-    if (duration < SLOT) {
-      return { ...base, start, end: start + SLOT, valid: false, deleting: false }
+    const duration = Math.floor(Math.min(DEFAULT_DURATION, room) / slot) * slot
+    if (duration < slot) {
+      return { ...base, start, end: start + slot, valid: false, deleting: false }
     }
-    return {
-      ...base,
-      start,
-      end: start + duration,
-      valid: true,
-      deleting: false,
-    }
+    return { ...base, start, end: start + duration, valid: true, deleting: false }
   }
 
   if (input.kind === "move") {
     const duration = input.originEnd - input.originStart
-    let start = snap(input.minute - input.grabOffset)
-    start = clamp(start, DAY_START, DAY_END - duration)
+    let start = snap(input.minute - input.grabOffset, slot)
+    start = clamp(start, rangeStart, rangeEnd - duration)
     const end = start + duration
     if (input.zone === "trash" || input.zone === "bank") {
       return { ...base, start, end, valid: true, deleting: true }
@@ -133,8 +127,8 @@ export function previewDrag(input: {
   if (input.kind === "resize-end") {
     const ceiling = input.tasks
       .filter((task) => task.id !== input.taskId && task.start >= input.originEnd)
-      .reduce((min, task) => Math.min(min, task.start), DAY_END)
-    const end = clamp(snap(input.minute), input.originStart + SLOT, ceiling)
+      .reduce((min, task) => Math.min(min, task.start), rangeEnd)
+    const end = clamp(snap(input.minute, slot), input.originStart + slot, ceiling)
     return {
       ...base,
       zone: "timeline",
@@ -147,8 +141,8 @@ export function previewDrag(input: {
 
   const floor = input.tasks
     .filter((task) => task.id !== input.taskId && task.end <= input.originStart)
-    .reduce((max, task) => Math.max(max, task.end), DAY_START)
-  const start = clamp(snap(input.minute), floor, input.originEnd - SLOT)
+    .reduce((max, task) => Math.max(max, task.end), rangeStart)
+  const start = clamp(snap(input.minute, slot), floor, input.originEnd - slot)
   return {
     ...base,
     zone: "timeline",
