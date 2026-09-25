@@ -53,7 +53,7 @@ export function TaskBlock({
       aria-label={`${name} ${formatRange(start, end)}`}
       onPointerDown={onPointerDown}
       className={cn(
-        "absolute start-20 end-3 z-10 flex cursor-grab touch-none items-center gap-2 overflow-hidden rounded-[20px] px-3 shadow-[0_8px_18px_rgba(80,70,90,0.12)] select-none active:cursor-grabbing",
+        "absolute start-20 end-3 z-10 flex cursor-grab touch-none items-center justify-center gap-2 overflow-hidden rounded-[20px] px-3 text-center shadow-[0_8px_18px_rgba(80,70,90,0.12)] select-none active:cursor-grabbing",
         active && "z-30 shadow-[0_14px_28px_rgba(80,70,90,0.2)]",
         mode === "invalid" && "opacity-60 saturate-50",
         mode === "deleting" && "scale-[0.98] opacity-45",
@@ -83,7 +83,7 @@ export function TaskBlock({
         {emoji}
       </span>
       {showName && (
-        <span className="pointer-events-none min-w-0">
+        <span className="pointer-events-none min-w-0 text-center">
           <span className="block truncate text-xl font-bold leading-6">{name}</span>
           {showTime && (
             <span dir="ltr" className="mt-0.5 block text-base font-semibold opacity-80">
