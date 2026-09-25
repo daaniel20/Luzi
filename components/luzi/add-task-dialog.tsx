@@ -27,12 +27,6 @@ type AddTaskDialogProps = {
   onSubmit: (task: TaskDraft) => void
 }
 
-function hintFor(color: TaskColorId) {
-  if (color === "green" || color === "mint") return "מתאים ללמידה"
-  if (color === "pink" || color === "rose") return "מתאים לפנאי"
-  return "מתאים לשגרה"
-}
-
 export function AddTaskDialog({ open, mode, initial, onOpenChange, onSubmit }: AddTaskDialogProps) {
   const [name, setName] = useState("")
   const [emoji, setEmoji] = useState("⭐")
@@ -113,7 +107,7 @@ export function AddTaskDialog({ open, mode, initial, onOpenChange, onSubmit }: A
 
           <div>
             <p className="mb-2 text-sm font-bold">
-              צבע · {palette.label} · {hintFor(color)}
+              צבע · {palette.label}
             </p>
             <div className="flex flex-wrap gap-2">
               {TASK_COLORS.map((item) => {
