@@ -15,6 +15,7 @@ type TaskBlockProps = {
   rangeStart: number
   slot: number
   slotPx: number
+  pad?: number
   mode: "idle" | "invalid" | "deleting" | "preview"
   active?: boolean
   onPointerDown?: (event: PointerEvent<HTMLDivElement>) => void
@@ -33,13 +34,14 @@ export function TaskBlock({
   rangeStart,
   slot,
   slotPx,
+  pad = 0,
   mode,
   active = false,
   onPointerDown,
   onResizePointerDown,
 }: TaskBlockProps) {
   const slots = Math.max(1, (end - start) / slot)
-  const top = ((start - rangeStart) / slot) * slotPx + 3
+  const top = pad + ((start - rangeStart) / slot) * slotPx + 3
   const height = Math.max(slots * slotPx - 6, slotPx - 6)
   const showName = height >= 52
   const showTime = height >= 78

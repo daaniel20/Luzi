@@ -20,6 +20,7 @@ export type ScheduleState = {
   rangeStart: number
   rangeEnd: number
   slot: number
+  split: number
 }
 
 function sanitizeTypes(value: unknown): TaskType[] {
@@ -73,6 +74,7 @@ const empty = (): ScheduleState => ({
   rangeStart: DEFAULT_RANGE_START,
   rangeEnd: DEFAULT_RANGE_END,
   slot: DEFAULT_SLOT,
+  split: 0.5,
 })
 
 export function loadSchedule(): ScheduleState {
@@ -87,6 +89,7 @@ export function loadSchedule(): ScheduleState {
       rangeStart?: unknown
       rangeEnd?: unknown
       slot?: unknown
+      split?: unknown
     }
     const types = sanitizeTypes(parsed.types)
     const typeIds = new Set(types.map((type) => type.id))
@@ -95,6 +98,10 @@ export function loadSchedule(): ScheduleState {
       types: types.length > 0 ? types : DEFAULT_TASK_TYPES,
       tasks,
       ...readAxis(parsed),
+      split:
+        typeof parsed.split === "number"
+          ? clamp(parsed.split, 0.22, 0.78)
+          : 0.5,
     }
   } catch {
     return empty()
@@ -111,6 +118,7 @@ export function saveSchedule(state: ScheduleState) {
       rangeStart: state.rangeStart,
       rangeEnd: state.rangeEnd,
       slot: state.slot,
+      split: state.split,
     })
   )
 }

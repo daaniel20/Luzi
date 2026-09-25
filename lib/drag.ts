@@ -46,9 +46,10 @@ export function minuteAtY(
   rect: DOMRect,
   scrollTop: number,
   slotPx: number,
-  axis: Axis
+  axis: Axis,
+  pad = 0
 ) {
-  const y = clientY - rect.top + scrollTop
+  const y = clientY - rect.top + scrollTop - pad
   const span = axis.rangeEnd - axis.rangeStart
   const maxY = (span / axis.slot) * slotPx
   const clamped = Math.min(Math.max(0, y), maxY)

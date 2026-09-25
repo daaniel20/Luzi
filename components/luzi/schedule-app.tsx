@@ -76,6 +76,8 @@ function readSlotPx() {
   return window.matchMedia("(max-width: 760px)").matches ? 40 : 48
 }
 
+const TRACK_PAD = 22
+
 function clockToMinutes(value: string) {
   const [hours, minutes] = value.split(":").map((part) => Number(part))
   if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return DEFAULT_RANGE_START
@@ -102,6 +104,7 @@ export function ScheduleApp() {
   const [draftStart, setDraftStart] = useState("06:30")
   const [draftEnd, setDraftEnd] = useState("06:30")
   const [exporting, setExporting] = useState(false)
+  const [split, setSplit] = useState(0.5)
   const [drag, setDrag] = useState<DragPreview | null>(null)
   const [editor, setEditor] = useState<TaskType | "new" | null>(null)
   const [deleteType, setDeleteType] = useState<TaskType | null>(null)
@@ -111,6 +114,7 @@ export function ScheduleApp() {
   const slotRef = useRef(slotPx)
   const axisRef = useRef({ rangeStart, rangeEnd, slot })
   const exportRef = useRef<HTMLDivElement>(null)
+  const splitRef = useRef<HTMLDivElement>(null)
   const sessionRef = useRef<Session | null>(null)
   const loopRef = useRef(0)
   const toastTimer = useRef(0)
@@ -135,7 +139,14 @@ export function ScheduleApp() {
     const element = scrollerRef.current
     const axis = axisRef.current
     if (!element) return axis.rangeStart
-    return minuteAtY(clientY, element.getBoundingClientRect(), element.scrollTop, slotRef.current, axis)
+    return minuteAtY(
+      clientY,
+      element.getBoundingClientRect(),
+      element.scrollTop,
+      slotRef.current,
+      axis,
+      TRACK_PAD
+    )
   }, [])
 
   const buildPreview = useCallback(
@@ -338,6 +349,7 @@ export function ScheduleApp() {
       setRangeStart(loaded.rangeStart)
       setRangeEnd(loaded.rangeEnd)
       setSlot(loaded.slot)
+      setSplit(loaded.split)
       axisRef.current = {
         rangeStart: loaded.rangeStart,
         rangeEnd: loaded.rangeEnd,
@@ -366,8 +378,8 @@ export function ScheduleApp() {
 
   useEffect(() => {
     if (!hydrated) return
-    saveSchedule({ types, tasks, rangeStart, rangeEnd, slot })
-  }, [hydrated, tasks, types, rangeStart, rangeEnd, slot])
+    saveSchedule({ types, tasks, rangeStart, rangeEnd, slot, split })
+  }, [hydrated, tasks, types, rangeStart, rangeEnd, slot, split])
 
   useEffect(() => {
     const tick = () => setNow(new Date())
@@ -408,7 +420,7 @@ export function ScheduleApp() {
           ? clockNow + DAY_MINUTES
           : null
   const slotCount = Math.max(1, Math.round((rangeEnd - rangeStart) / slot))
-  const trackHeight = slotCount * slotPx
+  const trackHeight = slotCount * slotPx + TRACK_PAD
   const deleting = drag?.deleting === true
   const slotIndex = SLOT_STEPS.indexOf(isSlotStep(slot) ? slot : DEFAULT_SLOT)
   const marks = Array.from({ length: slotCount + 1 }, (_, index) => rangeStart + index * slot).filter(
@@ -549,7 +561,7 @@ export function ScheduleApp() {
         </div>
       </header>
 
-      <div dir="ltr" className="grid min-h-0 flex-1 grid-cols-2 gap-3">
+      <div ref={splitRef} dir="ltr" className="flex min-h-0 flex-1">
 
       <section
         ref={bankRef}
@@ -559,6 +571,7 @@ export function ScheduleApp() {
           "flex min-h-0 min-w-0 flex-col rounded-[28px] bg-white/92 px-3 py-2.5 shadow-[0_10px_30px_rgba(90,130,160,0.08)] ring-1 ring-white transition",
           deleting && drag?.zone === "bank" && "bg-[#fff6f8] ring-4 ring-[#ff8fb3]"
         )}
+        style={{ width: `${split * 100}%` }}
       >
         <div className="mb-2 flex items-center justify-between gap-2">
           <h2 className="text-xl font-bold text-[#355067]">
@@ -637,7 +650,41 @@ export function ScheduleApp() {
         </div>
       </section>
 
-      <section dir="rtl" className="flex min-h-0 min-w-0 flex-col rounded-[28px] bg-white/92 p-3 shadow-[0_10px_30px_rgba(90,130,160,0.08)] ring-1 ring-white sm:p-4">
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="גרירת השוליים לשינוי הרוחב"
+        aria-valuemin={22}
+        aria-valuemax={78}
+        aria-valuenow={Math.round(split * 100)}
+        className="group relative z-20 w-4 shrink-0 cursor-col-resize touch-none"
+        onPointerDown={(event) => {
+          if (event.button !== 0) return
+          event.preventDefault()
+          const pointerId = event.pointerId
+          const move = (native: PointerEvent) => {
+            if (native.pointerId !== pointerId) return
+            const row = splitRef.current
+            if (!row) return
+            const rect = row.getBoundingClientRect()
+            const ratio = clamp((native.clientX - rect.left) / rect.width, 0.22, 0.78)
+            setSplit(ratio)
+          }
+          const end = (native: PointerEvent) => {
+            if (native.pointerId !== pointerId) return
+            window.removeEventListener("pointermove", move)
+            window.removeEventListener("pointerup", end)
+            window.removeEventListener("pointercancel", end)
+          }
+          window.addEventListener("pointermove", move)
+          window.addEventListener("pointerup", end)
+          window.addEventListener("pointercancel", end)
+        }}
+      >
+        <span className="absolute inset-y-6 left-1/2 w-1.5 -translate-x-1/2 rounded-full bg-[#b7cddd] group-hover:bg-[#6f97b4]" />
+      </div>
+
+      <section dir="rtl" className="flex min-h-0 min-w-0 flex-1 flex-col rounded-[28px] bg-white/92 p-3 shadow-[0_10px_30px_rgba(90,130,160,0.08)] ring-1 ring-white sm:p-4">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
             <h2 className="text-xl font-bold text-[#355067]">ציר היום</h2>
@@ -717,7 +764,7 @@ export function ScheduleApp() {
                       "pointer-events-none absolute inset-x-3 h-px",
                       major ? "bg-[#b7cddd]" : "bg-[#e3eef5]"
                     )}
-                    style={{ top: index * slotPx }}
+                    style={{ top: TRACK_PAD + index * slotPx }}
                   />
                 )
               })}
@@ -726,8 +773,8 @@ export function ScheduleApp() {
                 <div
                   key={minute}
                   dir="ltr"
-                  className="pointer-events-none absolute start-2 z-10 -translate-y-1/2 text-xs font-bold text-[#5d7386]"
-                  style={{ top: ((minute - rangeStart) / slot) * slotPx }}
+                  className="pointer-events-none absolute start-2 z-10 text-xs font-bold text-[#5d7386] -translate-y-1/2"
+                  style={{ top: TRACK_PAD + ((minute - rangeStart) / slot) * slotPx }}
                 >
                   {formatClock(minute)}
                 </div>
@@ -736,7 +783,7 @@ export function ScheduleApp() {
               {absoluteNow !== null && (
                 <div
                   className="pointer-events-none absolute inset-x-14 z-20 h-0.5 bg-[#ff8fb3]"
-                  style={{ top: ((absoluteNow - rangeStart) / slot) * slotPx }}
+                  style={{ top: TRACK_PAD + ((absoluteNow - rangeStart) / slot) * slotPx }}
                 >
                   <span className="absolute -top-3 end-1 rounded-full bg-[#ff8fb3] px-2 py-0.5 text-[11px] font-bold text-white">
                     עכשיו
@@ -769,6 +816,7 @@ export function ScheduleApp() {
                     rangeStart={rangeStart}
                     slot={slot}
                     slotPx={slotPx}
+                    pad={TRACK_PAD}
                     mode={mode}
                     active={Boolean(moving)}
                     onPointerDown={(event) => begin(event, "move", type.id, task)}
@@ -789,6 +837,7 @@ export function ScheduleApp() {
                   rangeStart={rangeStart}
                   slot={slot}
                   slotPx={slotPx}
+                  pad={TRACK_PAD}
                   mode={drag.valid ? "preview" : "invalid"}
                   active
                 />
