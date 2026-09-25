@@ -43,8 +43,8 @@ export function TaskBlock({
   const slots = Math.max(1, (end - start) / slot)
   const top = pad + ((start - rangeStart) / slot) * slotPx + 3
   const height = Math.max(slots * slotPx - 6, slotPx - 6)
-  const showName = height >= 52
-  const showTime = height >= 78
+  const showName = height >= 64
+  const showTime = height >= 96
   const handleHeight = slots <= 1 ? "h-4" : "h-8"
 
   return (
@@ -53,7 +53,7 @@ export function TaskBlock({
       aria-label={`${name} ${formatRange(start, end)}`}
       onPointerDown={onPointerDown}
       className={cn(
-        "absolute inset-x-16 z-10 flex cursor-grab touch-none items-center gap-2 overflow-hidden rounded-[20px] px-3 shadow-[0_8px_18px_rgba(80,70,90,0.12)] select-none active:cursor-grabbing",
+        "absolute start-20 end-3 z-10 flex cursor-grab touch-none items-center gap-2 overflow-hidden rounded-[20px] px-3 shadow-[0_8px_18px_rgba(80,70,90,0.12)] select-none active:cursor-grabbing",
         active && "z-30 shadow-[0_14px_28px_rgba(80,70,90,0.2)]",
         mode === "invalid" && "opacity-60 saturate-50",
         mode === "deleting" && "scale-[0.98] opacity-45",
@@ -79,18 +79,18 @@ export function TaskBlock({
         </button>
       )}
 
-      <span className="pointer-events-none text-[28px] leading-none" aria-hidden>
+      <span className="pointer-events-none text-[36px] leading-none" aria-hidden>
         {emoji}
       </span>
       {showName && (
         <span className="pointer-events-none min-w-0">
-          <span className="block truncate text-base font-bold leading-5">{name}</span>
+          <span className="block truncate text-xl font-bold leading-6">{name}</span>
           {showTime && (
-            <span dir="ltr" className="mt-0.5 block text-sm font-semibold opacity-80">
+            <span dir="ltr" className="mt-0.5 block text-base font-semibold opacity-80">
               {formatRange(start, end)}
             </span>
           )}
-          {mode === "invalid" && <span className="mt-0.5 block text-sm font-bold">תפוס</span>}
+          {mode === "invalid" && <span className="mt-0.5 block text-base font-bold">תפוס</span>}
         </span>
       )}
 
