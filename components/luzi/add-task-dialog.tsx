@@ -17,10 +17,14 @@ import { EMOJI_GROUPS } from "@/lib/emojis"
 import type { TaskColorId } from "@/lib/types"
 import { cn } from "cn"
 
+type TaskDraft = { name: string; emoji: string; color: TaskColorId }
+
 type AddTaskDialogProps = {
   open: boolean
+  mode: "create" | "edit"
+  initial: TaskDraft | null
   onOpenChange: (open: boolean) => void
-  onCreate: (task: { name: string; emoji: string; color: TaskColorId }) => void
+  onSubmit: (task: TaskDraft) => void
 }
 
 function hintFor(color: TaskColorId) {
@@ -29,7 +33,7 @@ function hintFor(color: TaskColorId) {
   return "מתאים לשגרה"
 }
 
-export function AddTaskDialog({ open, onOpenChange, onCreate }: AddTaskDialogProps) {
+export function AddTaskDialog({ open, mode, initial, onOpenChange, onSubmit }: AddTaskDialogProps) {
   const [name, setName] = useState("")
   const [emoji, setEmoji] = useState("⭐")
   const [color, setColor] = useState<TaskColorId>("green")
@@ -40,9 +44,9 @@ export function AddTaskDialog({ open, onOpenChange, onCreate }: AddTaskDialogPro
   if (open !== wasOpen) {
     setWasOpen(open)
     if (open) {
-      setName("")
-      setEmoji("⭐")
-      setColor("green")
+      setName(initial?.name ?? "")
+      setEmoji(initial?.emoji ?? "⭐")
+      setColor(initial?.color ?? "green")
       setCategory(EMOJI_GROUPS[0].id)
       setQuery("")
     }
@@ -69,9 +73,13 @@ export function AddTaskDialog({ open, onOpenChange, onCreate }: AddTaskDialogPro
     >
       <DialogContent className="flex max-h-[min(760px,calc(100dvh-1.5rem))] flex-col gap-4 overflow-hidden rounded-[28px] p-4 sm:max-w-xl sm:p-6">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">משימה חדשה</DialogTitle>
+          <DialogTitle className="text-2xl font-bold">
+            {mode === "edit" ? "עריכת משימה" : "משימה חדשה"}
+          </DialogTitle>
           <DialogDescription className="text-base">
-            בוחרים שם, צבע ואימוג׳י. אחר כך גוררים אותה אל הלוח.
+            {mode === "edit"
+              ? "אפשר לשנות את השם, הצבע והאימוג׳י. השינוי יופיע גם על הלוח."
+              : "בוחרים שם, צבע ואימוג׳י. אחר כך גוררים אותה אל הלוח."}
           </DialogDescription>
         </DialogHeader>
 
@@ -80,7 +88,7 @@ export function AddTaskDialog({ open, onOpenChange, onCreate }: AddTaskDialogPro
           onSubmit={(event) => {
             event.preventDefault()
             if (!trimmed) return
-            onCreate({ name: trimmed, emoji, color })
+            onSubmit({ name: trimmed, emoji, color })
           }}
         >
           <div className="flex items-center gap-3">
@@ -204,7 +212,7 @@ export function AddTaskDialog({ open, onOpenChange, onCreate }: AddTaskDialogPro
               disabled={!trimmed}
               className="h-12 flex-1 rounded-2xl text-base font-bold sm:flex-none sm:px-8"
             >
-              הוספה לבנק
+              {mode === "edit" ? "שמירה" : "הוספה לבנק"}
             </Button>
             <Button
               type="button"

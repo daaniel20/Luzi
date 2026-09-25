@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, Minus, Plus, Trash2 } from "lucide-react"
+import { ChevronDown, ChevronUp, Download, Minus, Pencil, Plus, Trash2 } from "lucide-react"
 import {
   useCallback,
   useEffect,
@@ -103,7 +103,7 @@ export function ScheduleApp() {
   const [draftEnd, setDraftEnd] = useState("06:30")
   const [exporting, setExporting] = useState(false)
   const [drag, setDrag] = useState<DragPreview | null>(null)
-  const [addOpen, setAddOpen] = useState(false)
+  const [editor, setEditor] = useState<TaskType | "new" | null>(null)
   const [deleteType, setDeleteType] = useState<TaskType | null>(null)
   const [toast, setToast] = useState<ToastState | null>(null)
 
@@ -425,12 +425,22 @@ export function ScheduleApp() {
         color: input.color,
       },
     ])
-    setAddOpen(false)
+    setEditor(null)
     showToast("המשימה נוספה לבנק")
     requestAnimationFrame(() => {
       const scroller = bankScrollRef.current
-      if (scroller) scroller.scrollLeft = scroller.scrollWidth
+      if (scroller) scroller.scrollTop = scroller.scrollHeight
     })
+  }
+
+  function saveEdit(input: { name: string; emoji: string; color: TaskColorId }) {
+    if (!editor || editor === "new") return
+    const id = editor.id
+    setTypes((previous) =>
+      previous.map((type) => (type.id === id ? { ...type, ...input } : type))
+    )
+    setEditor(null)
+    showToast("המשימה עודכנה")
   }
 
   function confirmDeleteType() {
@@ -499,7 +509,7 @@ export function ScheduleApp() {
   const dragType = drag ? typeMap.get(drag.typeId) : undefined
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-[1440px] flex-col gap-3 px-3 py-3 sm:px-5 sm:py-4 lg:h-dvh lg:min-h-0 lg:overflow-hidden">
+    <div className="mx-auto flex h-dvh w-full max-w-[1600px] flex-col gap-3 px-3 py-3 sm:px-5 sm:py-4">
       <header className="flex shrink-0 items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex size-14 shrink-0 items-center justify-center rounded-[22px] bg-gradient-to-br from-[#c5ebff] to-[#d9f6e4] text-3xl shadow-[0_8px_18px_rgba(120,170,200,0.18)]">
@@ -514,59 +524,62 @@ export function ScheduleApp() {
             </p>
           </div>
         </div>
-        <button
-          ref={trashRef}
-          type="button"
-          aria-label="פח אשפה. גוררים לכאן משימה כדי למחוק אותה מהלוח"
-          className={cn(
-            "flex h-[72px] w-[76px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-[24px] bg-[#ffe3ec] text-[#7a2944] shadow-[0_8px_18px_rgba(255,143,179,0.22)] transition",
-            deleting && drag?.zone === "trash" && "scale-110 bg-[#ff8fb3] ring-4 ring-[#ffd5e2]"
-          )}
-        >
-          <Trash2 className="size-7" />
-          <span className="text-sm font-bold">{deleting ? "לשחרר" : "פח"}</span>
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={exportImage}
+            disabled={exporting}
+            className="flex h-[72px] items-center gap-1 rounded-[24px] bg-[#d9f6e4] px-4 text-sm font-bold text-[#1f6b45] shadow-[0_8px_18px_rgba(107,207,134,0.2)] active:scale-95 disabled:opacity-60"
+          >
+            <Download className="size-5" />
+            {exporting ? "שומר..." : "תמונה"}
+          </button>
+          <button
+            ref={trashRef}
+            type="button"
+            aria-label="פח אשפה. גוררים לכאן משימה כדי למחוק אותה מהלוח"
+            className={cn(
+              "flex h-[72px] w-[76px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-[24px] bg-[#ffe3ec] text-[#7a2944] shadow-[0_8px_18px_rgba(255,143,179,0.22)] transition",
+              deleting && drag?.zone === "trash" && "scale-110 bg-[#ff8fb3] ring-4 ring-[#ffd5e2]"
+            )}
+          >
+            <Trash2 className="size-7" />
+            <span className="text-sm font-bold">{deleting ? "לשחרר" : "פח"}</span>
+          </button>
+        </div>
       </header>
+
+      <div dir="ltr" className="grid min-h-0 flex-1 grid-cols-2 gap-3">
 
       <section
         ref={bankRef}
+        dir="rtl"
         data-testid="task-bank"
         className={cn(
-          "relative shrink-0 rounded-[28px] bg-white/92 px-3 py-2.5 shadow-[0_10px_30px_rgba(90,130,160,0.08)] ring-1 ring-white transition",
+          "flex min-h-0 min-w-0 flex-col rounded-[28px] bg-white/92 px-3 py-2.5 shadow-[0_10px_30px_rgba(90,130,160,0.08)] ring-1 ring-white transition",
           deleting && drag?.zone === "bank" && "bg-[#fff6f8] ring-4 ring-[#ff8fb3]"
         )}
       >
-        <div className="mb-1.5 flex items-center justify-between gap-3">
-          <h2 className="text-base font-bold text-[#355067]">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <h2 className="text-xl font-bold text-[#355067]">
             {deleting ? "שחררו כאן כדי להוריד מהלוח" : "בנק המשימות"}
           </h2>
-          <p className="hidden text-sm font-medium text-[#6d7e8e] sm:block">
-            גוררים אל השעות, ומושכים מהקצה כדי לשנות משך
-          </p>
-        </div>
-        <div dir="ltr" className="flex items-center gap-1.5">
           <button
             type="button"
-            aria-label="גלילה לתחילת הבנק"
-            onClick={() => bankScrollRef.current?.scrollBy({ left: -240, behavior: "smooth" })}
-            className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-[#e7f3fb] text-[#3c6480] active:scale-95"
+            onClick={() => setEditor("new")}
+            className="inline-flex h-11 items-center gap-1 rounded-2xl bg-primary px-3 text-sm font-bold text-primary-foreground active:scale-95"
           >
-            <ChevronLeft className="size-6" />
+            <Plus className="size-4" />
+            חדשה
           </button>
-          <div
-            ref={bankScrollRef}
-            className="luzi-scroll flex min-w-0 flex-1 gap-2 overflow-x-auto py-1"
-            role="list"
-            aria-label="קוביות המשימות"
-          >
-            <button
-              type="button"
-              onClick={() => setAddOpen(true)}
-              className="inline-flex h-[80px] w-[84px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1 rounded-[20px] bg-primary text-sm font-bold text-primary-foreground focus-visible:ring-3 focus-visible:ring-ring active:scale-95"
-            >
-              <Plus className="size-6" />
-              חדשה
-            </button>
+        </div>
+        <div
+          ref={bankScrollRef}
+          className="luzi-scroll grid min-h-0 flex-1 content-start gap-2 overflow-y-auto py-1"
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))" }}
+          role="list"
+          aria-label="קוביות המשימות"
+        >
             {types.map((type) => {
               const color = colorById(type.color)
               const lifted = drag?.kind === "create" && drag.typeId === type.id
@@ -578,11 +591,21 @@ export function ScheduleApp() {
                   data-testid={`chip-${type.id}`}
                   onPointerDown={(event) => begin(event, "create", type.id)}
                   className={cn(
-                    "relative flex h-[80px] w-[92px] shrink-0 cursor-grab touch-none flex-col items-center justify-center gap-1 rounded-[20px] px-2 select-none active:cursor-grabbing",
+                    "relative flex h-[88px] w-full cursor-grab touch-none flex-col items-center justify-center gap-1 rounded-[20px] px-2 select-none active:cursor-grabbing",
                     lifted && "scale-95 opacity-45"
                   )}
                   style={{ background: color.bg, color: color.ink }}
                 >
+                  <button
+                    type="button"
+                    data-no-drag
+                    aria-label={`עריכת ${type.name}`}
+                    className="absolute top-1 right-1 flex size-8 items-center justify-center rounded-full bg-white/80 text-[#355067]"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={() => setEditor(type)}
+                  >
+                    <Pencil className="size-4" />
+                  </button>
                   <button
                     type="button"
                     data-no-drag
@@ -611,19 +634,10 @@ export function ScheduleApp() {
                 החזרת המשימות המקוריות
               </button>
             )}
-          </div>
-          <button
-            type="button"
-            aria-label="גלילה להמשך הבנק"
-            onClick={() => bankScrollRef.current?.scrollBy({ left: 240, behavior: "smooth" })}
-            className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-[#e7f3fb] text-[#3c6480] active:scale-95"
-          >
-            <ChevronRight className="size-6" />
-          </button>
         </div>
       </section>
 
-      <section className="flex min-h-[300px] flex-1 flex-col rounded-[28px] bg-white/92 p-3 shadow-[0_10px_30px_rgba(90,130,160,0.08)] ring-1 ring-white sm:p-4">
+      <section dir="rtl" className="flex min-h-0 min-w-0 flex-col rounded-[28px] bg-white/92 p-3 shadow-[0_10px_30px_rgba(90,130,160,0.08)] ring-1 ring-white sm:p-4">
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div className="min-w-0">
             <h2 className="text-xl font-bold text-[#355067]">ציר היום</h2>
@@ -664,15 +678,6 @@ export function ScheduleApp() {
                 <Plus className="size-5" />
               </button>
             </div>
-            <button
-              type="button"
-              onClick={exportImage}
-              disabled={exporting}
-              className="flex h-12 items-center gap-1 rounded-2xl bg-[#d9f6e4] px-3 text-sm font-bold text-[#1f6b45] active:scale-95 disabled:opacity-60"
-            >
-              <Download className="size-4" />
-              {exporting ? "שומר..." : "תמונה"}
-            </button>
             <div dir="ltr" className="flex items-center gap-1">
               <button
                 type="button"
@@ -803,6 +808,7 @@ export function ScheduleApp() {
           )}
         </div>
       </section>
+      </div>
 
       {dragType && drag && (
         <div
@@ -861,7 +867,18 @@ export function ScheduleApp() {
         </div>
       )}
 
-      <AddTaskDialog open={addOpen} onOpenChange={setAddOpen} onCreate={createType} />
+      <AddTaskDialog
+        open={editor !== null}
+        mode={editor && editor !== "new" ? "edit" : "create"}
+        initial={editor && editor !== "new" ? editor : null}
+        onOpenChange={(open) => {
+          if (!open) setEditor(null)
+        }}
+        onSubmit={(input) => {
+          if (editor && editor !== "new") saveEdit(input)
+          else createType(input)
+        }}
+      />
 
       <Dialog open={rangeOpen} onOpenChange={setRangeOpen}>
         <DialogContent className="rounded-[28px] sm:max-w-md">
