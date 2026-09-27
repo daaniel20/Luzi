@@ -96,7 +96,7 @@ export function ScheduleApp() {
   const [tasks, setTasks] = useState<ScheduledTask[]>([])
   const [hydrated, setHydrated] = useState(false)
   const [now, setNow] = useState<Date | null>(null)
-  const [slotPx, setSlotPx] = useState(readSlotPx)
+  const [slotPx, setSlotPx] = useState(44)
   const [rangeStart, setRangeStart] = useState(DEFAULT_RANGE_START)
   const [rangeEnd, setRangeEnd] = useState(DEFAULT_RANGE_END)
   const [slot, setSlot] = useState(DEFAULT_SLOT)
@@ -451,6 +451,7 @@ export function ScheduleApp() {
       slotRef.current = next
       setSlotPx(next)
     }
+    onResize()
     window.addEventListener("resize", onResize)
     return () => window.removeEventListener("resize", onResize)
   }, [])
