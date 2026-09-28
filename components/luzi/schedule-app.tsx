@@ -937,13 +937,14 @@ export function ScheduleApp() {
           </div>
         </div>
 
-        <div className="relative isolate min-h-[220px] flex-1">
+        <div className="relative min-h-[220px] flex-1">
+          <div className="absolute inset-0 z-0">
           <div
             ref={scrollerRef}
             data-testid="timeline"
             dir="ltr"
             className={cn(
-              "luzi-track luzi-scroll absolute inset-0 z-0 overflow-x-hidden overflow-y-auto rounded-[22px] transition-colors duration-500",
+              "luzi-track luzi-scroll h-full w-full overflow-x-hidden overflow-y-auto rounded-[22px] transition-colors duration-500",
               allDone ? "bg-[#d9f6e4]" : "bg-[#f4f9fc]"
             )}
           >
@@ -1056,6 +1057,7 @@ export function ScheduleApp() {
                 />
               )}
             </div>
+          </div>
           </div>
 
           {allDone && (
