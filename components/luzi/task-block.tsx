@@ -95,14 +95,23 @@ export function TaskBlock({
           aria-label={done ? `${name} סומן כבוצע` : `סימון ${name} כבוצע`}
           aria-pressed={done}
           className={cn(
-            "absolute start-2 top-1/2 z-20 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border-[3px] text-2xl font-bold leading-none shadow-sm",
+            "absolute start-2 top-1/2 z-20 flex size-11 -translate-y-1/2 touch-manipulation items-center justify-center rounded-full border-[3px] text-2xl font-bold leading-none shadow-sm",
             done
               ? "border-[#1f6b45] bg-[#1f6b45] text-white"
               : "border-[#8aa4b8] bg-white text-transparent"
           )}
           onPointerDown={(event) => event.stopPropagation()}
+          onPointerUp={(event) => {
+            event.stopPropagation()
+            event.currentTarget.dataset.tapped = "1"
+            onToggleDone()
+          }}
           onClick={(event) => {
             event.stopPropagation()
+            if (event.currentTarget.dataset.tapped === "1") {
+              delete event.currentTarget.dataset.tapped
+              return
+            }
             onToggleDone()
           }}
         >

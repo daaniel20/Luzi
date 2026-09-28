@@ -89,6 +89,49 @@ function clockToMinutes(value: string) {
   return clamp(hours, 0, 23) * 60 + clamp(minutes, 0, 59)
 }
 
+const STAR_BURST = [
+  { left: "12%", bottom: "18%", delay: "0s", glyph: "⭐" },
+  { left: "28%", bottom: "30%", delay: "0.08s", glyph: "✨" },
+  { left: "46%", bottom: "42%", delay: "0.16s", glyph: "⭐" },
+  { left: "63%", bottom: "18%", delay: "0.24s", glyph: "✨" },
+  { left: "78%", bottom: "30%", delay: "0.32s", glyph: "⭐" },
+  { left: "18%", bottom: "42%", delay: "0.4s", glyph: "✨" },
+  { left: "55%", bottom: "22%", delay: "0.48s", glyph: "⭐" },
+  { left: "88%", bottom: "36%", delay: "0.56s", glyph: "✨" },
+]
+
+function StarBurst() {
+  const [run, setRun] = useState(false)
+
+  useEffect(() => {
+    let second = 0
+    const first = window.requestAnimationFrame(() => {
+      second = window.requestAnimationFrame(() => setRun(true))
+    })
+    return () => {
+      window.cancelAnimationFrame(first)
+      window.cancelAnimationFrame(second)
+    }
+  }, [])
+
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 z-30"
+      style={{ transform: "translateZ(0)" }}
+    >
+      {STAR_BURST.map((star) => (
+        <div
+          key={`${star.left}-${star.bottom}`}
+          className={cn("luzi-star", run && "luzi-star-run")}
+          style={{ left: star.left, bottom: star.bottom, ["--star-delay" as string]: star.delay }}
+        >
+          {star.glyph}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function countLabel(count: number) {
   if (count === 0) return "הלוח עדיין ריק"
   if (count === 1) return "משימה אחת בלוח"
@@ -894,13 +937,13 @@ export function ScheduleApp() {
           </div>
         </div>
 
-        <div className="relative min-h-[220px] flex-1">
+        <div className="relative isolate min-h-[220px] flex-1">
           <div
             ref={scrollerRef}
             data-testid="timeline"
             dir="ltr"
             className={cn(
-              "luzi-track luzi-scroll absolute inset-0 overflow-x-hidden overflow-y-auto rounded-[22px] transition-colors duration-500",
+              "luzi-track luzi-scroll absolute inset-0 z-0 overflow-x-hidden overflow-y-auto rounded-[22px] transition-colors duration-500",
               allDone ? "bg-[#d9f6e4]" : "bg-[#f4f9fc]"
             )}
           >
@@ -1017,7 +1060,8 @@ export function ScheduleApp() {
 
           {allDone && (
             <div
-              className="pointer-events-none absolute top-3 right-3 z-30 flex items-center gap-2 rounded-full bg-white/95 px-3 py-2 shadow-md"
+              className="pointer-events-none absolute top-3 right-3 z-40 flex items-center gap-2 rounded-full bg-white/95 px-3 py-2 shadow-md"
+              style={{ transform: "translateZ(0)" }}
               role="status"
             >
               <span className="text-3xl leading-none" aria-hidden>
@@ -1027,24 +1071,7 @@ export function ScheduleApp() {
             </div>
           )}
 
-          {burstKey > 0 && allDone && (
-            <div key={burstKey} className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
-              {["12%", "28%", "46%", "63%", "78%", "18%", "55%", "88%"].map((left, index) => (
-                <span
-                  key={left}
-                  className="luzi-star absolute text-3xl"
-                  style={{
-                    left,
-                    bottom: `${18 + (index % 3) * 12}%`,
-                    animationDelay: `${index * 0.08}s`,
-                  }}
-                  aria-hidden
-                >
-                  {index % 2 === 0 ? "⭐" : "✨"}
-                </span>
-              ))}
-            </div>
-          )}
+          {burstKey > 0 && allDone && <StarBurst key={burstKey} />}
 
           {tasks.length === 0 && drag?.kind !== "create" && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-8 text-center">
