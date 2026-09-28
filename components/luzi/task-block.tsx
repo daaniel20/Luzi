@@ -20,6 +20,7 @@ type TaskBlockProps = {
   done?: boolean
   active?: boolean
   onToggleDone?: () => void
+  onRemove?: () => void
   onPointerDown?: (event: PointerEvent<HTMLDivElement>) => void
   onResizePointerDown?: (
     edge: "start" | "end",
@@ -41,6 +42,7 @@ export function TaskBlock({
   done = false,
   active = false,
   onToggleDone,
+  onRemove,
   onPointerDown,
   onResizePointerDown,
 }: TaskBlockProps) {
@@ -59,6 +61,7 @@ export function TaskBlock({
       className={cn(
         "absolute start-20 end-3 z-10 flex cursor-grab touch-none items-center justify-center gap-2 overflow-hidden rounded-[20px] px-3 text-center shadow-[0_8px_18px_rgba(80,70,90,0.12)] select-none active:cursor-grabbing",
         onToggleDone && "ps-14",
+        onRemove && "pe-14",
         active && "z-30 shadow-[0_14px_28px_rgba(80,70,90,0.2)]",
         mode === "invalid" && "opacity-60 saturate-50",
         mode === "deleting" && "scale-[0.98] opacity-45",
@@ -104,6 +107,22 @@ export function TaskBlock({
           }}
         >
           {done ? <span aria-hidden>✓</span> : null}
+        </button>
+      )}
+
+      {onRemove && (
+        <button
+          type="button"
+          data-no-drag
+          aria-label={`הורדת ${name} מהלוח`}
+          className="absolute end-2 top-1/2 z-20 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border-[3px] border-[#e7a0b4] bg-white text-2xl font-bold leading-none text-[#9a3050] shadow-sm"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation()
+            onRemove()
+          }}
+        >
+          <span aria-hidden>×</span>
         </button>
       )}
 

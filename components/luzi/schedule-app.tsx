@@ -946,6 +946,17 @@ export function ScheduleApp() {
                         )
                       )
                     }
+                    onRemove={() => {
+                      const current = task
+                      setTasks((previous) => previous.filter((item) => item.id !== current.id))
+                      showToast("המשימה ירדה מהלוח", () => {
+                        setTasks((previous) => {
+                          if (previous.some((item) => item.id === current.id)) return previous
+                          if (overlaps(previous, current.start, current.end)) return previous
+                          return [...previous, current]
+                        })
+                      })
+                    }}
                     active={Boolean(moving)}
                     onPointerDown={(event) => begin(event, "move", type.id, task)}
                     onResizePointerDown={(edge, event) =>
