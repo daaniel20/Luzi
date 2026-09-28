@@ -8,9 +8,27 @@ const rubik = Rubik({
   variable: "--font-rubik",
 });
 
+const description =
+  "לוח זמנים יומי לילדים. גוררים משימה לשעה, מסמנים כשנגמר, ורואים את כל היום במבט אחד."
+
 export const metadata: Metadata = {
+  metadataBase: new URL("https://luzi-mocha.vercel.app"),
   title: "LUZI · הלוח היומי",
-  description: "בונים לוח זמנים יומי לילדים בגרירה ושחרור, ברבעי שעה.",
+  description,
+  applicationName: "LUZI",
+  openGraph: {
+    title: "LUZI · הלוח היומי",
+    description,
+    url: "https://luzi-mocha.vercel.app",
+    siteName: "LUZI",
+    locale: "he_IL",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "LUZI · הלוח היומי",
+    description,
+  },
 };
 
 export const viewport: Viewport = {
