@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { colorById } from "@/lib/colors"
+import { renderSchedulePng } from "@/lib/export-board"
 import { DEFAULT_TASK_TYPES } from "@/lib/defaults"
 import {
   minuteAtY,
@@ -589,26 +590,29 @@ export function ScheduleApp() {
     if (!node || exporting) return
     setExporting(true)
     try {
-      const { toPng } = await import("html-to-image")
-      const wrap = document.createElement("div")
-      wrap.dir = "rtl"
-      wrap.style.cssText = `width:${Math.max(node.offsetWidth, 360)}px;background:#f4f9fc;padding:20px;font-family:Rubik,sans-serif;`
-      const title = document.createElement("div")
-      title.style.cssText = "font-weight:700;font-size:28px;color:#355067;margin-bottom:6px;"
-      title.textContent = "LUZI"
-      const subtitle = document.createElement("div")
-      subtitle.dir = "ltr"
-      subtitle.style.cssText = "font-weight:600;font-size:16px;color:#5d7386;margin-bottom:14px;text-align:right;"
-      subtitle.textContent = `${dateLabel}  ·  ${formatRange(rangeStart, rangeEnd)}  ·  ${slotLabel(slot)}`
-      wrap.append(title, subtitle, node.cloneNode(true) as HTMLElement)
-      wrap.style.position = "fixed"
-      wrap.style.left = "-10000px"
-      wrap.style.top = "0"
-      document.body.appendChild(wrap)
-      const dataUrl = await toPng(wrap, { pixelRatio: 2, backgroundColor: "#f4f9fc" })
-      wrap.remove()
+      const image = await renderSchedulePng({
+        dateLabel,
+        rangeStart,
+        rangeEnd,
+        slot,
+        tasks: tasks.flatMap((task) => {
+          const type = typeMap.get(task.typeId)
+          if (!type || task.end <= rangeStart || task.start >= rangeEnd) return []
+          const color = colorById(type.color)
+          return [
+            {
+              name: type.name,
+              emoji: type.emoji,
+              bg: color.bg,
+              ink: color.ink,
+              start: task.start,
+              end: task.end,
+              done: task.done === true,
+            },
+          ]
+        }),
+      })
       const fileName = `luzi-${new Date().toISOString().slice(0, 10)}.png`
-      const image = await fetch(dataUrl).then((response) => response.blob())
       const file = new File([image], fileName, { type: "image/png" })
       const share = { files: [file], title: "LUZI" }
       if (navigator.canShare?.(share)) {
@@ -620,9 +624,10 @@ export function ScheduleApp() {
         }
       }
       const link = document.createElement("a")
-      link.href = dataUrl
+      link.href = URL.createObjectURL(image)
       link.download = fileName
       link.click()
+      URL.revokeObjectURL(link.href)
     } catch {
       showToast("לא הצלחנו לייצא תמונה")
     } finally {
