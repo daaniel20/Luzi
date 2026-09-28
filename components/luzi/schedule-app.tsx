@@ -104,6 +104,7 @@ export function ScheduleApp() {
   const [draftStart, setDraftStart] = useState("06:30")
   const [draftEnd, setDraftEnd] = useState("06:30")
   const [exporting, setExporting] = useState(false)
+  const [burstKey, setBurstKey] = useState(0)
   const [split, setSplit] = useState(0.5)
   const [drag, setDrag] = useState<DragPreview | null>(null)
   const [editor, setEditor] = useState<TaskType | "new" | null>(null)
@@ -116,6 +117,7 @@ export function ScheduleApp() {
   const slotRef = useRef(slotPx)
   const axisRef = useRef({ rangeStart, rangeEnd, slot })
   const exportRef = useRef<HTMLDivElement>(null)
+  const wasCompleteRef = useRef(false)
   const splitRef = useRef<HTMLDivElement>(null)
   const sessionRef = useRef<Session | null>(null)
   const loopRef = useRef(0)
@@ -481,6 +483,13 @@ export function ScheduleApp() {
 
   useEffect(() => stopLoop, [stopLoop])
 
+  const allDone = tasks.length > 0 && tasks.every((task) => task.done === true)
+
+  useEffect(() => {
+    if (allDone && !wasCompleteRef.current) setBurstKey((key) => key + 1)
+    wasCompleteRef.current = allDone
+  }, [allDone])
+
   const typeMap = useMemo(() => new Map(types.map((type) => [type.id, type])), [types])
 
   const dateLabel = now
@@ -832,7 +841,10 @@ export function ScheduleApp() {
             ref={scrollerRef}
             data-testid="timeline"
             dir="ltr"
-            className="luzi-track luzi-scroll absolute inset-0 overflow-x-hidden overflow-y-auto rounded-[22px] bg-[#f4f9fc]"
+            className={cn(
+              "luzi-track luzi-scroll absolute inset-0 overflow-x-hidden overflow-y-auto rounded-[22px] transition-colors duration-500",
+              allDone ? "bg-[#d9f6e4]" : "bg-[#f4f9fc]"
+            )}
           >
             <div ref={exportRef} className="relative w-full" style={{ height: trackHeight }}>
               {Array.from({ length: slotCount + 1 }, (_, index) => {
@@ -933,6 +945,37 @@ export function ScheduleApp() {
               )}
             </div>
           </div>
+
+          {allDone && (
+            <div
+              className="pointer-events-none absolute top-3 right-3 z-30 flex items-center gap-2 rounded-full bg-white/95 px-3 py-2 shadow-md"
+              role="status"
+            >
+              <span className="text-3xl leading-none" aria-hidden>
+                🏅
+              </span>
+              <span className="text-base font-bold text-[#1f6b45]">כל הכבוד</span>
+            </div>
+          )}
+
+          {burstKey > 0 && allDone && (
+            <div key={burstKey} className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
+              {["12%", "28%", "46%", "63%", "78%", "18%", "55%", "88%"].map((left, index) => (
+                <span
+                  key={left}
+                  className="luzi-star absolute text-3xl"
+                  style={{
+                    left,
+                    bottom: `${18 + (index % 3) * 12}%`,
+                    animationDelay: `${index * 0.08}s`,
+                  }}
+                  aria-hidden
+                >
+                  {index % 2 === 0 ? "⭐" : "✨"}
+                </span>
+              ))}
+            </div>
+          )}
 
           {tasks.length === 0 && drag?.kind !== "create" && (
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center px-8 text-center">

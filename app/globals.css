@@ -166,3 +166,21 @@ body {
   background: #c5d8e6;
   border-radius: 999px;
 }
+
+@keyframes luzi-star-pop {
+  0% {
+    transform: translateY(16px) scale(0.3);
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-92px) scale(1.15);
+    opacity: 0;
+  }
+}
+
+.luzi-star {
+  animation: luzi-star-pop 1.8s ease-out forwards;
+}
