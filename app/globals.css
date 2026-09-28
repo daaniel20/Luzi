@@ -182,5 +182,5 @@ body {
 }
 
 .luzi-star {
-  animation: luzi-star-pop 1.8s ease-out forwards;
+  animation: luzi-star-pop 10s ease-out forwards;
 }
