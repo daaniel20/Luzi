@@ -924,7 +924,7 @@ export function ScheduleApp() {
                 <div
                   key={minute}
                   dir="ltr"
-                  className="pointer-events-none absolute start-2 z-10 text-lg font-bold text-[#5d7386] -translate-y-1/2"
+                  className="luzi-hour pointer-events-none absolute start-2 z-10 text-lg font-bold text-[#5d7386] -translate-y-1/2"
                   style={{ top: TRACK_PAD + ((minute - rangeStart) / slot) * slotPx }}
                 >
                   {formatClock(minute)}
@@ -933,7 +933,7 @@ export function ScheduleApp() {
 
               {absoluteNow !== null && (
                 <div
-                  className="pointer-events-none absolute start-20 end-3 z-20 h-0.5 bg-[#ff8fb3]"
+                  className="luzi-now pointer-events-none absolute start-20 end-3 z-20 h-0.5 bg-[#ff8fb3]"
                   style={{ top: TRACK_PAD + ((absoluteNow - rangeStart) / slot) * slotPx }}
                 >
                   <span className="absolute -top-3 end-1 rounded-full bg-[#ff8fb3] px-2 py-0.5 text-[11px] font-bold text-white">

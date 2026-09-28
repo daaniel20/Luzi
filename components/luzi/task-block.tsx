@@ -59,7 +59,7 @@ export function TaskBlock({
       aria-label={`${name} ${formatRange(start, end)}${done ? " בוצע" : ""}`}
       onPointerDown={onPointerDown}
       className={cn(
-        "absolute start-20 end-3 z-10 flex cursor-grab touch-none items-center justify-center gap-2 overflow-hidden rounded-[20px] px-3 text-center shadow-[0_8px_18px_rgba(80,70,90,0.12)] select-none active:cursor-grabbing",
+        "luzi-task absolute start-20 end-3 z-10 flex cursor-grab touch-none items-center justify-center gap-2 overflow-hidden rounded-[20px] px-3 text-center shadow-[0_8px_18px_rgba(80,70,90,0.12)] select-none active:cursor-grabbing",
         onToggleDone && "ps-14",
         onRemove && "pe-14",
         active && "z-30 shadow-[0_14px_28px_rgba(80,70,90,0.2)]",
@@ -126,12 +126,12 @@ export function TaskBlock({
         </button>
       )}
 
-      <span className="pointer-events-none text-[36px] leading-none" aria-hidden>
+      <span className="luzi-task-emoji pointer-events-none text-[36px] leading-none" aria-hidden>
         {emoji}
       </span>
       {showName && (
         <span className="pointer-events-none min-w-0 text-center">
-          <span className={cn("block truncate text-xl font-bold leading-6", done && "line-through")}>
+          <span className={cn("luzi-task-name block truncate text-xl font-bold leading-6", done && "line-through")}>
             {name}
           </span>
           {showTime && (

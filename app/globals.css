@@ -183,6 +183,35 @@ body {
   .luzi-split {
     display: none;
   }
+
+  .luzi-hour {
+    font-size: 0.95rem;
+  }
+
+  .luzi-task,
+  .luzi-now {
+    inset-inline-start: 3.35rem;
+  }
+
+  .luzi-task {
+    flex-direction: column;
+    gap: 0.1rem;
+  }
+
+  .luzi-task-emoji {
+    font-size: 28px;
+  }
+
+  .luzi-task-name {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+    text-overflow: unset;
+    font-size: 1rem;
+    line-height: 1.2rem;
+  }
 }
 
 .luzi-scroll {
