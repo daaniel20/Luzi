@@ -92,10 +92,10 @@ export function TaskBlock({
           aria-label={done ? `${name} סומן כבוצע` : `סימון ${name} כבוצע`}
           aria-pressed={done}
           className={cn(
-            "absolute start-2 top-1/2 z-20 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border-2 text-2xl font-bold leading-none shadow-sm",
+            "absolute start-2 top-1/2 z-20 flex size-11 -translate-y-1/2 items-center justify-center rounded-full border-[3px] text-2xl font-bold leading-none shadow-sm",
             done
               ? "border-[#1f6b45] bg-[#1f6b45] text-white"
-              : "border-white/90 bg-white/85 text-[#355067]/35"
+              : "border-[#8aa4b8] bg-white text-transparent"
           )}
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
@@ -103,7 +103,7 @@ export function TaskBlock({
             onToggleDone()
           }}
         >
-          <span aria-hidden>✓</span>
+          {done ? <span aria-hidden>✓</span> : null}
         </button>
       )}
 
