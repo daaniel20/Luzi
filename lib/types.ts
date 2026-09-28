@@ -26,4 +26,5 @@ export type ScheduledTask = {
   typeId: string
   start: number
   end: number
+  done?: boolean
 }

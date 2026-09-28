@@ -1,5 +1,5 @@
 import { isTaskColor } from "@/lib/colors"
-import { DEFAULT_TASK_TYPES } from "@/lib/defaults"
+import { DEFAULT_TASK_TYPES, withCurrentDefaults } from "@/lib/defaults"
 import type { ScheduledTask, TaskType } from "@/lib/types"
 import {
   DAY_MINUTES,
@@ -51,7 +51,13 @@ function sanitizeTasks(value: unknown, typeIds: Set<string>): ScheduledTask[] {
     const start = clamp(Math.round(item.start), 0, DAY_MINUTES * 2 - 5)
     const end = clamp(Math.round(item.end), start + 5, DAY_MINUTES * 2)
     if (overlaps(tasks, start, end)) continue
-    tasks.push({ id: item.id, typeId: item.typeId, start, end })
+    tasks.push({
+      id: item.id,
+      typeId: item.typeId,
+      start,
+      end,
+      done: item.done === true,
+    })
   }
   return tasks
 }
@@ -91,7 +97,7 @@ export function loadSchedule(): ScheduleState {
       slot?: unknown
       split?: unknown
     }
-    const types = sanitizeTypes(parsed.types)
+    const types = withCurrentDefaults(sanitizeTypes(parsed.types))
     const typeIds = new Set(types.map((type) => type.id))
     const tasks = parsed.day === todayKey() ? sanitizeTasks(parsed.tasks, typeIds) : []
     return {

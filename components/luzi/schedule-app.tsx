@@ -280,6 +280,7 @@ export function ScheduleApp() {
             typeId: session.typeId,
             start: view.start,
             end: view.end,
+            done: false,
           },
         ])
         return
@@ -897,7 +898,15 @@ export function ScheduleApp() {
                     slot={slot}
                     slotPx={slotPx}
                     pad={TRACK_PAD}
+                    done={task.done === true}
                     mode={mode}
+                    onToggleDone={() =>
+                      setTasks((previous) =>
+                        previous.map((item) =>
+                          item.id === task.id ? { ...item, done: !item.done } : item
+                        )
+                      )
+                    }
                     active={Boolean(moving)}
                     onPointerDown={(event) => begin(event, "move", type.id, task)}
                     onResizePointerDown={(edge, event) =>
