@@ -77,6 +77,10 @@ function readSlotPx() {
   return window.matchMedia("(max-width: 760px)").matches ? 40 : 48
 }
 
+function readNarrow() {
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches
+}
+
 const TRACK_PAD = 22
 
 function clockToMinutes(value: string) {
@@ -125,6 +129,7 @@ export function ScheduleApp() {
   const loopRef = useRef(0)
   const toastTimer = useRef(0)
   const didInitialScroll = useRef(false)
+  const narrowRef = useRef(false)
   const scrollerRef = useRef<HTMLDivElement>(null)
   const bankRef = useRef<HTMLElement>(null)
   const bankScrollRef = useRef<HTMLDivElement>(null)
@@ -207,7 +212,10 @@ export function ScheduleApp() {
         const bank = bankScrollRef.current
         if (bank) {
           const bankRect = bank.getBoundingClientRect()
-          if (session.y < bankRect.top + 40) bank.scrollTop -= 12
+          if (narrowRef.current) {
+            if (session.x < bankRect.left + 48) bank.scrollBy({ left: -16 })
+            else if (session.x > bankRect.right - 48) bank.scrollBy({ left: 16 })
+          } else if (session.y < bankRect.top + 40) bank.scrollTop -= 12
           else if (session.y > bankRect.bottom - 40) bank.scrollTop += 12
           const chips = [...bank.querySelectorAll<HTMLElement>("[data-testid^='chip-']")]
           let target = 0
@@ -339,7 +347,8 @@ export function ScheduleApp() {
       if (event.button !== 0 || sessionRef.current) return
       const target = event.target
       if (target instanceof Element && target.closest("[data-no-drag]")) return
-      event.preventDefault()
+      const narrowCreate = narrowRef.current && kind === "create"
+      if (!narrowCreate) event.preventDefault()
 
       const session: Session = {
         pointerId: event.pointerId,
@@ -356,13 +365,36 @@ export function ScheduleApp() {
         grabOffset: 0,
       }
       sessionRef.current = session
+      let held = !narrowCreate
+      const holdTimer = narrowCreate
+        ? window.setTimeout(() => {
+            held = true
+          }, 180)
+        : 0
+
+      const release = () => {
+        window.clearTimeout(holdTimer)
+        window.removeEventListener("pointermove", onMove)
+        window.removeEventListener("pointerup", onUp)
+        window.removeEventListener("pointercancel", onCancel)
+      }
 
       const onMove = (native: PointerEvent) => {
         if (native.pointerId !== session.pointerId || !sessionRef.current) return
         session.x = native.clientX
         session.y = native.clientY
         if (!session.active) {
-          const distance = Math.hypot(native.clientX - session.originX, native.clientY - session.originY)
+          const dx = native.clientX - session.originX
+          const dy = native.clientY - session.originY
+          if (narrowCreate && !held) {
+            if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+              release()
+              if (sessionRef.current === session) sessionRef.current = null
+              return
+            }
+            if (Math.abs(dy) < 12 || Math.abs(dy) <= Math.abs(dx)) return
+          }
+          const distance = Math.hypot(dx, dy)
           const threshold = session.kind.startsWith("resize") ? 3 : 8
           if (distance < threshold) return
           session.active = true
@@ -379,9 +411,7 @@ export function ScheduleApp() {
 
       const finish = (native: PointerEvent, shouldCommit: boolean) => {
         if (native.pointerId !== session.pointerId) return
-        window.removeEventListener("pointermove", onMove)
-        window.removeEventListener("pointerup", onUp)
-        window.removeEventListener("pointercancel", onCancel)
+        release()
         stopLoop()
         const droppedInBank =
           shouldCommit &&
@@ -453,6 +483,7 @@ export function ScheduleApp() {
       const next = readSlotPx()
       slotRef.current = next
       setSlotPx(next)
+      narrowRef.current = readNarrow()
     }
     onResize()
     window.addEventListener("resize", onResize)
@@ -540,7 +571,21 @@ export function ScheduleApp() {
     showToast("המשימה נוספה לבנק")
     requestAnimationFrame(() => {
       const scroller = bankScrollRef.current
-      if (scroller) scroller.scrollTop = scroller.scrollHeight
+      if (!scroller) return
+      if (!narrowRef.current) {
+        scroller.scrollTop = scroller.scrollHeight
+        return
+      }
+      const chips = scroller.querySelectorAll<HTMLElement>("[data-testid^='chip-']")
+      const chip = chips[chips.length - 1]
+      if (!chip) return
+      const chipRect = chip.getBoundingClientRect()
+      const bankRect = scroller.getBoundingClientRect()
+      if (chipRect.left < bankRect.left + 8) {
+        scroller.scrollBy({ left: chipRect.left - bankRect.left - 12 })
+      } else if (chipRect.right > bankRect.right - 8) {
+        scroller.scrollBy({ left: chipRect.right - bankRect.right + 12 })
+      }
     })
   }
 
@@ -639,11 +684,11 @@ export function ScheduleApp() {
     <div className="mx-auto flex h-dvh w-full max-w-[1600px] flex-col gap-3 px-3 py-3 sm:px-5 sm:py-4">
       <header className="flex shrink-0 items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-14 shrink-0 items-center justify-center rounded-[22px] bg-gradient-to-br from-[#c5ebff] to-[#d9f6e4] text-3xl shadow-[0_8px_18px_rgba(120,170,200,0.18)]">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#c5ebff] to-[#d9f6e4] text-2xl shadow-[0_8px_18px_rgba(120,170,200,0.18)] min-[761px]:size-14 min-[761px]:rounded-[22px] min-[761px]:text-3xl">
             <span aria-hidden>🌤️</span>
           </div>
           <div className="min-w-0">
-            <h1 className="text-[32px] leading-none font-bold tracking-tight text-[#355067]">
+            <h1 className="text-2xl leading-none font-bold tracking-tight text-[#355067] min-[761px]:text-[32px]">
               LUZI
             </h1>
             <p className="mt-1 truncate text-sm font-medium text-[#6d7e8e] sm:text-base">
@@ -656,7 +701,7 @@ export function ScheduleApp() {
             type="button"
             onClick={exportImage}
             disabled={exporting}
-            className="flex h-[72px] items-center gap-1 rounded-[24px] bg-[#d9f6e4] px-4 text-sm font-bold text-[#1f6b45] shadow-[0_8px_18px_rgba(107,207,134,0.2)] active:scale-95 disabled:opacity-60"
+            className="flex h-12 items-center gap-1 rounded-2xl bg-[#d9f6e4] px-3 text-sm font-bold text-[#1f6b45] shadow-[0_8px_18px_rgba(107,207,134,0.2)] active:scale-95 disabled:opacity-60 min-[761px]:h-[72px] min-[761px]:rounded-[24px] min-[761px]:px-4"
           >
             <Download className="size-5" />
             {exporting ? "שומר..." : canShareImage ? "שליחה" : "תמונה"}
@@ -664,14 +709,14 @@ export function ScheduleApp() {
         </div>
       </header>
 
-      <div ref={splitRef} dir="ltr" className="flex min-h-0 flex-1">
+      <div ref={splitRef} dir="ltr" className="luzi-workspace flex min-h-0 flex-1">
 
       <section
         ref={bankRef}
         dir="rtl"
         data-testid="task-bank"
         className={cn(
-          "flex min-h-0 min-w-0 flex-col rounded-[28px] bg-white/92 px-3 py-2.5 shadow-[0_10px_30px_rgba(90,130,160,0.08)] ring-1 ring-white transition",
+          "luzi-bank flex min-h-0 min-w-0 flex-col rounded-[28px] bg-white/92 px-3 py-2.5 shadow-[0_10px_30px_rgba(90,130,160,0.08)] ring-1 ring-white transition",
           deleting && drag?.zone === "bank" && "bg-[#fff6f8] ring-4 ring-[#ff8fb3]"
         )}
         style={{ width: `${split * 100}%` }}
@@ -691,7 +736,7 @@ export function ScheduleApp() {
         </div>
         <div
           ref={bankScrollRef}
-          className="luzi-scroll grid min-h-0 flex-1 content-start gap-2 overflow-y-auto py-1"
+          className="luzi-bank-list luzi-scroll grid min-h-0 flex-1 content-start gap-2 overflow-y-auto py-1"
           style={{ gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))" }}
           role="list"
           aria-label="קוביות המשימות"
@@ -707,7 +752,7 @@ export function ScheduleApp() {
                   data-testid={`chip-${type.id}`}
                   onPointerDown={(event) => begin(event, "create", type.id)}
                   className={cn(
-                    "relative flex h-[104px] w-full cursor-grab touch-none flex-col items-center justify-center gap-1 rounded-[20px] px-2 select-none active:cursor-grabbing",
+                    "luzi-chip relative flex h-[104px] w-full cursor-grab touch-none flex-col items-center justify-center gap-1 rounded-[20px] px-2 select-none active:cursor-grabbing",
                     lifted && "scale-95 opacity-45"
                   )}
                   style={{ background: color.bg, color: color.ink }}
@@ -760,7 +805,7 @@ export function ScheduleApp() {
         aria-valuemin={22}
         aria-valuemax={78}
         aria-valuenow={Math.round(split * 100)}
-        className="group relative z-20 w-4 shrink-0 cursor-col-resize touch-none"
+        className="luzi-split group relative z-20 w-4 shrink-0 cursor-col-resize touch-none"
         onPointerDown={(event) => {
           if (event.button !== 0) return
           event.preventDefault()
@@ -803,11 +848,11 @@ export function ScheduleApp() {
             <button
               type="button"
               onClick={openRange}
-              className="h-12 rounded-2xl bg-[#e7f3fb] px-3 text-sm font-bold text-[#355067] active:scale-95"
+              className="h-10 rounded-2xl bg-[#e7f3fb] px-3 text-sm font-bold text-[#355067] active:scale-95 min-[761px]:h-12"
             >
               טווח שעות
             </button>
-            <div className="flex h-12 items-center gap-1 rounded-2xl bg-[#e7f3fb] px-1">
+            <div className="flex h-10 items-center gap-1 rounded-2xl bg-[#e7f3fb] px-1 min-[761px]:h-12">
               <button
                 type="button"
                 aria-label="רזולוציה גסה יותר"
@@ -833,7 +878,7 @@ export function ScheduleApp() {
                 type="button"
                 aria-label="שעות מוקדמות יותר"
                 onClick={() => scrollerRef.current?.scrollBy({ top: -slotPx * 4, behavior: "smooth" })}
-                className="flex size-12 items-center justify-center rounded-2xl bg-[#ffc999] text-[#6b3a0c] active:scale-95"
+                className="flex size-10 items-center justify-center rounded-2xl bg-[#ffc999] text-[#6b3a0c] active:scale-95 min-[761px]:size-12"
               >
                 <ChevronUp className="size-6" />
               </button>
@@ -841,7 +886,7 @@ export function ScheduleApp() {
                 type="button"
                 aria-label="שעות מאוחרות יותר"
                 onClick={() => scrollerRef.current?.scrollBy({ top: slotPx * 4, behavior: "smooth" })}
-                className="flex size-12 items-center justify-center rounded-2xl bg-[#ffc999] text-[#6b3a0c] active:scale-95"
+                className="flex size-10 items-center justify-center rounded-2xl bg-[#ffc999] text-[#6b3a0c] active:scale-95 min-[761px]:size-12"
               >
                 <ChevronDown className="size-6" />
               </button>

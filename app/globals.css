@@ -151,6 +151,38 @@ body {
   .luzi-track {
     --slot: 54px;
   }
+
+  .luzi-workspace {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .luzi-bank {
+    width: 100% !important;
+    height: auto;
+    flex: 0 0 auto;
+  }
+
+  .luzi-bank-list {
+    display: flex;
+    flex: none;
+    height: 124px;
+    align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x;
+  }
+
+  .luzi-chip {
+    width: 108px;
+    flex: 0 0 auto;
+    touch-action: pan-x;
+  }
+
+  .luzi-split {
+    display: none;
+  }
 }
 
 .luzi-scroll {
