@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronDown, ChevronUp, Download, Minus, Pencil, Plus, Trash2 } from "lucide-react"
+import { ChevronDown, ChevronUp, Download, Minus, Pencil, Plus } from "lucide-react"
 import {
   useCallback,
   useEffect,
@@ -128,8 +128,6 @@ export function ScheduleApp() {
   const scrollerRef = useRef<HTMLDivElement>(null)
   const bankRef = useRef<HTMLElement>(null)
   const bankScrollRef = useRef<HTMLDivElement>(null)
-  const trashRef = useRef<HTMLButtonElement>(null)
-
   const showToast = useCallback((message: string, undo?: () => void) => {
     window.clearTimeout(toastTimer.current)
     setToast({ message, undo })
@@ -170,7 +168,7 @@ export function ScheduleApp() {
         tasks: tasksRef.current,
         zone: zoneAt(session.x, session.y, {
           timeline: timeline?.getBoundingClientRect() ?? null,
-          trash: trashRef.current?.getBoundingClientRect() ?? null,
+          trash: null,
           bank: bankRef.current?.getBoundingClientRect() ?? null,
         }),
         minute: readMinute(session.y),
@@ -391,7 +389,7 @@ export function ScheduleApp() {
           session.kind === "create" &&
           zoneAt(session.x, session.y, {
             timeline: scrollerRef.current?.getBoundingClientRect() ?? null,
-            trash: trashRef.current?.getBoundingClientRect() ?? null,
+            trash: null,
             bank: bankRef.current?.getBoundingClientRect() ?? null,
           }) === "bank"
         if (session.kind === "create" && session.active && !droppedInBank && orderRef.current) {
@@ -662,18 +660,6 @@ export function ScheduleApp() {
           >
             <Download className="size-5" />
             {exporting ? "שומר..." : canShareImage ? "שליחה" : "תמונה"}
-          </button>
-          <button
-            ref={trashRef}
-            type="button"
-            aria-label="פח אשפה. גוררים לכאן משימה כדי למחוק אותה מהלוח"
-            className={cn(
-              "flex h-[72px] w-[76px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-[24px] bg-[#ffe3ec] text-[#7a2944] shadow-[0_8px_18px_rgba(255,143,179,0.22)] transition",
-              deleting && drag?.zone === "trash" && "scale-110 bg-[#ff8fb3] ring-4 ring-[#ffd5e2]"
-            )}
-          >
-            <Trash2 className="size-7" />
-            <span className="text-sm font-bold">{deleting ? "לשחרר" : "פח"}</span>
           </button>
         </div>
       </header>
@@ -1020,7 +1006,7 @@ export function ScheduleApp() {
               <div className="max-w-sm rounded-[24px] bg-white/80 px-5 py-4 shadow-sm">
                 <p className="text-lg font-bold text-[#355067]">גררו לכאן משימה מהבנק</p>
                 <p className="mt-1 text-sm font-medium text-[#6d7e8e]">
-                  היא תיצמד לרזולוציה שבחרתם. מושכים מהקצה העליון או התחתון כדי להאריך, ואל הפח כדי למחוק.
+                  היא תיצמד לרזולוציה שבחרתם. מושכים מהקצה כדי להאריך, וה־X מוריד אותה מהלוח.
                 </p>
               </div>
             </div>
