@@ -23,7 +23,34 @@ const LEGACY_DEFAULT_IDS = [
   "sleep",
 ]
 
+const PREVIOUS_STARTER_IDS = [
+  "screen-tv",
+  "screen-tablet",
+  "screen-sony",
+  "podcast",
+  "bike",
+  "bed",
+  "wake",
+  "breakfast",
+  "teeth",
+  "school",
+  "read",
+  "homework",
+  "draw",
+  "play",
+  "friends",
+  "park",
+  "lego",
+  "lunch",
+  "snack",
+  "dinner",
+  "shower",
+  "sleep",
+]
+
 export const DEFAULT_TASK_TYPES: TaskType[] = [
+  { id: "refresh", name: "עצירה להתרעננות", emoji: "😌", color: "sky" },
+  { id: "tidy", name: "סידור הבית", emoji: "🧹", color: "peach" },
   { id: "screen-tv", name: "זמן מסך - טלוויזיה", emoji: "📺", color: "rose" },
   { id: "screen-tablet", name: "זמן מסך - טאבלט", emoji: "💻", color: "sky" },
   { id: "screen-sony", name: "זמן מסך - סוני", emoji: "🎮", color: "lilac" },
@@ -40,7 +67,6 @@ export const DEFAULT_TASK_TYPES: TaskType[] = [
   { id: "play", name: "משחק", emoji: "⚽", color: "pink" },
   { id: "friends", name: "חברים", emoji: "🤝", color: "pink" },
   { id: "park", name: "פארק", emoji: "🌳", color: "mint" },
-  { id: "lego", name: "לגו", emoji: "🧱", color: "pink" },
   { id: "lunch", name: "צהריים", emoji: "🍽️", color: "orange" },
   { id: "snack", name: "חטיף", emoji: "🍎", color: "peach" },
   { id: "dinner", name: "ארוחת ערב", emoji: "🍲", color: "orange" },
@@ -48,9 +74,14 @@ export const DEFAULT_TASK_TYPES: TaskType[] = [
   { id: "sleep", name: "שינה", emoji: "🌙", color: "mint" },
 ]
 
+function isExactSet(types: TaskType[], ids: string[]) {
+  const allowed = new Set(ids)
+  return types.length === ids.length && types.every((type) => allowed.has(type.id))
+}
+
 export function withCurrentDefaults(types: TaskType[]): TaskType[] {
-  const legacy = new Set(LEGACY_DEFAULT_IDS)
-  const untouched =
-    types.length === LEGACY_DEFAULT_IDS.length && types.every((type) => legacy.has(type.id))
-  return untouched ? DEFAULT_TASK_TYPES : types
+  if (isExactSet(types, LEGACY_DEFAULT_IDS) || isExactSet(types, PREVIOUS_STARTER_IDS)) {
+    return DEFAULT_TASK_TYPES
+  }
+  return types
 }
