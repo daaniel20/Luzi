@@ -104,6 +104,7 @@ export function ScheduleApp() {
   const [draftStart, setDraftStart] = useState("06:30")
   const [draftEnd, setDraftEnd] = useState("06:30")
   const [exporting, setExporting] = useState(false)
+  const [canShareImage, setCanShareImage] = useState(false)
   const [burstKey, setBurstKey] = useState(0)
   const [split, setSplit] = useState(0.5)
   const [drag, setDrag] = useState<DragPreview | null>(null)
@@ -483,6 +484,15 @@ export function ScheduleApp() {
 
   useEffect(() => stopLoop, [stopLoop])
 
+  useEffect(() => {
+    try {
+      const file = new File([new Uint8Array([1])], "luzi.png", { type: "image/png" })
+      setCanShareImage(Boolean(navigator.canShare?.({ files: [file] })))
+    } catch {
+      setCanShareImage(false)
+    }
+  }, [])
+
   const allDone = tasks.length > 0 && tasks.every((task) => task.done === true)
 
   useEffect(() => {
@@ -597,9 +607,21 @@ export function ScheduleApp() {
       document.body.appendChild(wrap)
       const dataUrl = await toPng(wrap, { pixelRatio: 2, backgroundColor: "#f4f9fc" })
       wrap.remove()
+      const fileName = `luzi-${new Date().toISOString().slice(0, 10)}.png`
+      const image = await fetch(dataUrl).then((response) => response.blob())
+      const file = new File([image], fileName, { type: "image/png" })
+      const share = { files: [file], title: "LUZI" }
+      if (navigator.canShare?.(share)) {
+        try {
+          await navigator.share(share)
+          return
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") return
+        }
+      }
       const link = document.createElement("a")
       link.href = dataUrl
-      link.download = `luzi-${new Date().toISOString().slice(0, 10)}.png`
+      link.download = fileName
       link.click()
     } catch {
       showToast("לא הצלחנו לייצא תמונה")
@@ -634,7 +656,7 @@ export function ScheduleApp() {
             className="flex h-[72px] items-center gap-1 rounded-[24px] bg-[#d9f6e4] px-4 text-sm font-bold text-[#1f6b45] shadow-[0_8px_18px_rgba(107,207,134,0.2)] active:scale-95 disabled:opacity-60"
           >
             <Download className="size-5" />
-            {exporting ? "שומר..." : "תמונה"}
+            {exporting ? "שומר..." : canShareImage ? "שליחה" : "תמונה"}
           </button>
           <button
             ref={trashRef}
